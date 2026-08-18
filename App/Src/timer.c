@@ -24,28 +24,11 @@ THE SOFTWARE.
 
 */
 
-#include "config.h"
 #include "tim.h"
 #include "timer.h"
 
-void timer_init(void)
-{
-	__HAL_RCC_TIM2_CLK_ENABLE();
-
-	TIM2->CR1 = 0;
-	TIM2->CR2 = 0;
-	TIM2->SMCR = 0;
-	TIM2->DIER = 0;
-	TIM2->CCMR1 = 0;
-	TIM2->CCMR2 = 0;
-	TIM2->CCER = 0;
-	TIM2->PSC = (TIM2_CLOCK_SPEED / 1000000) - 1;   // run @1MHz = 1us
-	TIM2->ARR = 0xFFFFFFFF;
-	TIM2->CR1 |= TIM_CR1_CEN;
-	TIM2->EGR = TIM_EGR_UG;
-}
-
 uint32_t timer_get(void)
 {
+	// 1us计时
 	return TIM2->CNT;
 }
