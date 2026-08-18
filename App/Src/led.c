@@ -27,7 +27,7 @@ THE SOFTWARE.
 #include <string.h>
 
 #include "led.h"
-#include "gpio.h"
+#include "gpio_.h"
 #include "util.h"
 
 #define SEQ_ISPASSED(now, target) ((int32_t) ((now) - (target)) >= 0)

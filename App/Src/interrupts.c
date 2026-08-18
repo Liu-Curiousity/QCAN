@@ -27,35 +27,11 @@ THE SOFTWARE.
 #include <stdint.h>
 #include "stm32f0xx_hal.h"
 
-void NMI_Handler(void)
-{
-	__asm__ ("BKPT");
-	while (1);
-}
-
-void HardFault_Handler(void)
-{
-	__asm__ ("BKPT");
-	while (1);
-}
-
-void SysTick_Handler(void)
-{
-	HAL_IncTick();
-	HAL_SYSTICK_IRQHandler();
-}
-
 extern PCD_HandleTypeDef hpcd_USB_FS;
 void USB_Handler(void)
 {
 	HAL_PCD_IRQHandler(&hpcd_USB_FS);
 }
-
-// void Default_Handler(void)
-// {
-// 	__asm__ ("BKPT");
-// 	while (1);
-// }
 
 extern void Reset_Handler(void);
 

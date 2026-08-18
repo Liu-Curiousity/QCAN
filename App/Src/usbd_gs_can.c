@@ -32,7 +32,7 @@
 #include "compiler.h"
 #include "config.h"
 #include "dfu.h"
-#include "gpio.h"
+#include "gpio_.h"
 #include "gs_usb.h"
 #include "host_frame.h"
 #include "led.h"
