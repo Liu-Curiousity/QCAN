@@ -26,48 +26,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "usb.h"
 #include "usbd_core.h"
 #include "usbd_ctlreq.h"
 #include "usbd_def.h"
 #include "usbd_gs_can.h"
-
-PCD_HandleTypeDef hpcd_USB_FS;
-
-void HAL_PCD_MspInit(PCD_HandleTypeDef *hpcd)
-{
-	if (hpcd->Instance == USB_INTERFACE) {
-#if defined(USB)
-		__HAL_RCC_USB_CLK_ENABLE();
-#elif defined(USB_OTG_FS)
-		__HAL_RCC_USB_OTG_FS_CLK_ENABLE();
-#elif defined(USB_DRD_FS)
-		__HAL_RCC_USB_CLK_ENABLE();
-		HAL_SYSCFG_StrobeDBattpinsConfig(SYSCFG_CFGR1_UCPD1_STROBE);
-		/* Enable VDDUSB */
-		if (__HAL_RCC_PWR_IS_CLK_DISABLED()) {
-			__HAL_RCC_PWR_CLK_ENABLE();
-			HAL_PWREx_EnableVddUSB();
-			__HAL_RCC_PWR_CLK_DISABLE();
-		} else {
-			HAL_PWREx_EnableVddUSB();
-		}
-#endif
-		HAL_NVIC_SetPriority(USB_INTERRUPT, 1, 0);
-		HAL_NVIC_EnableIRQ(USB_INTERRUPT);
-	}
-}
-
-void HAL_PCD_MspDeInit(PCD_HandleTypeDef* hpcd)
-{
-	if (hpcd->Instance == USB_INTERFACE) {
-#if defined(USB) || defined(USB_DRD_FS)
-		__HAL_RCC_USB_CLK_DISABLE();
-#elif defined(USB_OTG_FS)
-		__HAL_RCC_USB_OTG_FS_CLK_DISABLE();
-#endif
-		HAL_NVIC_DisableIRQ(USB_INTERRUPT);
-	}
-}
 
 void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 {

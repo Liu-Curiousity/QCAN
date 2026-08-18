@@ -19,6 +19,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_core.h"
+#include "stm32f0xx_hal.h"
 
 /** @addtogroup STM32_USBD_DEVICE_LIBRARY
 * @{
