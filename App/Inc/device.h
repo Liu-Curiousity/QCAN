@@ -27,8 +27,5 @@ THE SOFTWARE.
 */
 
 #include "can.h"
-#include "stm32f072xb.h"
 
 void device_can_init(can_data_t *channel, const struct board_channel_config *channel_config);
-
-void device_sysclock_config(void);

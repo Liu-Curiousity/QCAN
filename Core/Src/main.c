@@ -108,7 +108,7 @@ int main(void)
   MX_CAN_Init();
   MX_I2C2_Init();
   MX_USART1_UART_Init();
-  MX_USB_PCD_Init();
+  // MX_USB_PCD_Init();
   MX_USART4_UART_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
@@ -170,10 +170,6 @@ int main(void)
       CAN_HandleError(&hGS_CAN, channel);
 
       led_update(&channel->leds);
-    }
-
-    if (USBD_GS_CAN_DfuDetachRequested(&hUSB)) {
-      dfu_run_bootloader();
     }
     /* USER CODE END WHILE */
 
