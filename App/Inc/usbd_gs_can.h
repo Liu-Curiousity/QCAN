@@ -1,0 +1,144 @@
+/*
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2016 Hubert Denkmair
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ *
+ */
+
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+
+#include "can.h"
+#include "compiler.h"
+#include "config.h"
+#include "dfu.h"
+#include "gs_usb.h"
+#include "list.h"
+#include "usbd_def.h"
+
+/* Define these here so they can be referenced in other files */
+
+#ifdef CONFIG_CANFD
+#define CAN_DATA_MAX_PACKET_SIZE 64    /* Endpoint IN & OUT Packet size */
+#else
+#define CAN_DATA_MAX_PACKET_SIZE 32    /* Endpoint IN & OUT Packet size */
+#endif
+#define USB_CAN_CONFIG_DESC_SIZ	 50
+#define USBD_GS_CAN_VENDOR_CODE	 0x20
+#define DFU_INTERFACE_NUM		 1
+#define DFU_INTERFACE_STR_INDEX	 0xE0
+
+extern USBD_ClassTypeDef USBD_GS_CAN;
+
+#ifdef CONFIG_CANFD
+#define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, canfd_ts, 1)
+#else
+#define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, classic_can_ts, 1)
+#endif
+
+// When using double buffer for RX, this needs to be at least 2 to
+// ensure there is always an RX buffer ready to receive the
+// RX frames.
+#if defined(USB) || defined(USB_DRD_FS)
+#define USBD_GS_CAN_RX_BUFFER_COUNT 2
+#else
+#define USBD_GS_CAN_RX_BUFFER_COUNT 1
+#endif
+
+struct gs_host_frame_object {
+	struct list_head list;
+	union {
+		uint8_t _buf[GS_HOST_FRAME_SIZE];
+		struct gs_host_frame frame;
+	};
+};
+
+typedef struct {
+	union ep0 {
+		struct_group_tagged(ep0_data, data, union {
+			// Device -> Host
+			struct dfu_status dfu_status;
+			struct gs_device_state state;
+
+			// Host -> Device
+			const struct gs_host_config config;
+			const struct gs_device_bittiming bittiming;
+			const struct gs_device_mode mode;
+			const struct gs_identify_mode identify_mode;
+			const struct gs_device_filter filter;
+
+			// Device <-> Host
+			struct gs_device_termination_state term_state;
+			struct gs_device_tdc tdc;
+		}; );
+		uint8_t __aligned(4) buf[sizeof(struct ep0_data)];
+	} ep0;
+
+	USBD_SetupReqTypedef last_setup_request;
+
+	struct list_head list_frame_pool;
+	struct list_head list_to_host;
+
+	struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT];
+	struct gs_host_frame_object *to_host_buf;
+
+	can_data_t channels[NUM_CAN_CHANNEL];
+
+	uint32_t sof_timestamp_us;
+
+	struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE];
+
+	bool dfu_detach_requested;
+} USBD_GS_CAN_HandleTypeDef __attribute__ ((aligned (4)));
+
+void usbd_gs_can_purge_from_host_list_by_channel(USBD_GS_CAN_HandleTypeDef *hcan,
+												 struct can_channel *channel);
+
+void usbd_gs_can_purge_to_host_list_by_channel(USBD_GS_CAN_HandleTypeDef *hcan,
+											   const struct can_channel *channel);
+
+#if defined(STM32F0)
+# define USB_INTERFACE USB
+# define USB_INTERRUPT USB_IRQn
+#elif defined(STM32F4)
+# define USB_INTERFACE USB_OTG_FS
+# define USB_INTERRUPT OTG_FS_IRQn
+
+// RX FIFO is defined in words, so divide bytes by 4
+// RX FIFO size chosen according to reference manual RM0368 which suggests
+// using (largest packet size / 4) + 1
+# define USB_RX_FIFO_SIZE ((256U / 4U) + 1U)
+#elif defined(STM32G0)
+# define USB_INTERFACE	  USB_DRD_FS
+# define USB_INTERRUPT	  USB_UCPD1_2_IRQn
+#endif
+
+uint8_t USBD_GS_CAN_Init(USBD_GS_CAN_HandleTypeDef *hcan, USBD_HandleTypeDef *pdev);
+void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev);
+void USBD_GS_CAN_ResumeCallback(USBD_HandleTypeDef *pdev);
+void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
+void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev);
+bool USBD_GS_CAN_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
+bool USBD_GS_CAN_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
+
+bool USBD_GS_CAN_DfuDetachRequested(USBD_HandleTypeDef *pdev);

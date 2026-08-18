@@ -1,0 +1,147 @@
+/*-
+ * Copyright (c) 2010 Isilon Systems, Inc.
+ * Copyright (c) 2010 iX Systems, Inc.
+ * Copyright (c) 2010 Panasas, Inc.
+ * Copyright (c) 2013-2016 Mellanox Technologies, Ltd.
+ * Copyright (c) 2015 François Tigeot
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice unmodified, this list of conditions, and the following
+ *    disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * $FreeBSD$
+ */
+#ifndef _LINUXKPI_LINUX_COMPILER_H_
+#define _LINUXKPI_LINUX_COMPILER_H_
+
+#include "zephyr/sys/util.h"
+#include "zephyr/sys/util_macro.h"
+
+#ifndef __aligned
+#define __aligned(x) __attribute__((__aligned__(x)))
+#endif
+
+#ifndef __packed
+#define __packed __attribute__((__packed__))
+#endif
+
+#ifndef __maybe_unused
+#define __maybe_unused __attribute__((__unused__))
+#endif
+
+#if __has_attribute(__fallthrough__)
+#define fallthrough __attribute__((__fallthrough__))
+#else
+#define fallthrough do {} while (0) /* fallthrough */
+#endif
+
+#ifndef __weak
+#define __weak __attribute__((weak))
+#endif
+
+#define barrier()	   __asm__ __volatile__ ("" : : : "memory")
+
+#define ACCESS_ONCE(x) (*(volatile __typeof(x) *)&(x))
+
+#define WRITE_ONCE(x,v) \
+		do { \
+			barrier(); \
+			ACCESS_ONCE(x) = (v); \
+			barrier(); \
+		} while (0)
+
+#define READ_ONCE(x) \
+		({ \
+		__typeof(x) __var = ({ \
+			barrier(); \
+			ACCESS_ONCE(x); \
+		}); \
+		barrier(); \
+		__var; \
+	})
+
+#define lockless_dereference(p) READ_ONCE(p)
+
+#define sizeof_field(_s, _m)	sizeof(((_s *)0)->_m)
+
+#define container_of(ptr, type, member) \
+		({ \
+		__typeof(((type *)0)->member) *_p = (ptr); \
+		(type *)((char *)_p - offsetof(type, member)); \
+	})
+
+#define struct_size(ptr, field, num) \
+		(offsetof(__typeof(*(ptr)), field) + sizeof((ptr)->field[0]) * (num))
+
+#define DECLARE_FLEX_ARRAY(_t, _n) \
+		struct { \
+			struct { } __dummy_ ## _n; \
+			_t _n[0]; \
+		}
+
+#ifndef __struct_group
+#define __struct_group(_tag, _name, _attrs, _members ...) \
+		union { \
+			struct { _members } _attrs; \
+			struct _tag { _members } _attrs _name; \
+		} _attrs
+#endif
+
+#ifndef struct_group
+#define struct_group(_name, _members ...) \
+		__struct_group(/* no tag */, _name, /* no attrs */, _members)
+#endif
+
+#ifndef struct_group_tagged
+#define struct_group_tagged(_tag, _name, _members ...) \
+		__struct_group(_tag, _name, /* no attrs */, _members)
+#endif
+
+#define min(x, y) ((x) < (y) ? (x) : (y))
+#define max(x, y) ((x) > (y) ? (x) : (y))
+
+/*
+ * BUILD_BUG_ON() can happen inside functions where _Static_assert() does not
+ * seem to work.  Use old-schoold-ish CTASSERT from before commit
+ * a3085588a88fa58eb5b1eaae471999e1995a29cf but also make sure we do not
+ * end up with an unused typedef or variable. The compiler should optimise
+ * it away entirely.
+ */
+#define _O_CTASSERT(x)				   _O__CTASSERT(x, __LINE__)
+#define _O__CTASSERT(x, y)			   _O___CTASSERT(x, y)
+#define _O___CTASSERT(x, y)			   while (0) { \
+			typedef char __assert_line_ ## y[(x) ? 1 : -1]; \
+			__assert_line_ ## y _x __maybe_unused; \
+			_x[0] = '\0'; \
+}
+
+#define BUILD_BUG()					   do { CTASSERT(0); } while (0)
+#define BUILD_BUG_ON(x)				   do { _O_CTASSERT(!(x)) } while (0)
+#define BUILD_BUG_ON_MSG(x, msg)	   BUILD_BUG_ON(x)
+#define BUILD_BUG_ON_NOT_POWER_OF_2(x) BUILD_BUG_ON(!powerof2(x))
+#define BUILD_BUG_ON_INVALID(expr)	   while (0) { (void)(expr); }
+#define BUILD_BUG_ON_ZERO(x)		   ((int)sizeof(struct { int: -((x) != 0); }))
+
+#undef static_assert
+#define static_assert(x, ...)		 __static_assert(x, ## __VA_ARGS__, #x)
+#define __static_assert(x, msg, ...) _Static_assert(x, msg)
+
+#endif /* _LINUXKPI_LINUX_COMPILER_H_ */
