@@ -31,8 +31,6 @@
 
 #define time_after(a, b) ((int)((b) - (a)) < 0)
 
-void hex32(char *out, uint32_t val);
-
 // ARM's
 // "Application Note 321 ARM Cortex-M Programming Guide to Memory Barrier Instructions"
 // (from https://developer.arm.com/documentation/dai0321/latest) says that
@@ -91,10 +89,4 @@ static inline void restore_irq(bool was_enabled)
 #define assert_basic(exp)   \
 		if (exp) {          \
 		} else              \
-		assert_failed()
-
-/** halt / set core to debug state with BKPT.
- *
- * TODO : save extra info somewhere in RAM, and let WDT auto-reset ?
- */
-void assert_failed(void);
+		__BKPT(0)

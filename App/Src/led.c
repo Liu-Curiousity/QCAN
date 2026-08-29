@@ -164,6 +164,6 @@ void led_update(led_data_t *leds)
 			break;
 
 		default:
-			assert_failed();
+			assert_basic(0);
 	}
 }
