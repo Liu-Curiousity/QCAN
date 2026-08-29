@@ -28,7 +28,6 @@
 #include "can_common.h"
 #include "can_drv.h"
 #include "config.h"
-#include "device.h"
 #include "gs_usb.h"
 #include "timer.h"
 
@@ -89,6 +88,22 @@ static void rcc_reset(CAN_TypeDef *instance)
 		__HAL_RCC_CAN2_RELEASE_RESET();
 	}
 #endif
+}
+
+void device_can_init(can_data_t *channel)
+{
+	__HAL_RCC_CAN1_CLK_ENABLE();
+
+	GPIO_InitTypeDef itd = {
+		.Pin = GPIO_PIN_8 | GPIO_PIN_9,
+		.Mode = GPIO_MODE_AF_PP,
+		.Pull = GPIO_NOPULL,
+		.Speed = GPIO_SPEED_FREQ_HIGH,
+		.Alternate = GPIO_AF4_CAN,
+	};
+	HAL_GPIO_Init(GPIOB, &itd);
+
+	channel->instance = CAN;
 }
 
 void can_init(can_data_t *channel)
