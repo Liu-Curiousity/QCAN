@@ -28,4 +28,9 @@ THE SOFTWARE.
 
 #include <stdint.h>
 
-uint32_t timer_get(void);
+static inline uint32_t timer_get(void)
+{
+    // 1us计时
+    return TIM2->CNT;
+}
+
