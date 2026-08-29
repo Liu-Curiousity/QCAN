@@ -23,11 +23,10 @@
  *
  */
 
-#include "board.h"
 #include "can.h"
 #include "device.h"
 
-void device_can_init(can_data_t *channel, const struct board_channel_config *channel_config)
+void device_can_init(can_data_t *channel)
 {
 	__HAL_RCC_CAN1_CLK_ENABLE();
 
@@ -40,5 +39,5 @@ void device_can_init(can_data_t *channel, const struct board_channel_config *cha
 	};
 	HAL_GPIO_Init(GPIOB, &itd);
 
-	channel->instance = channel_config->interface;
+	channel->instance = CAN;
 }

@@ -82,9 +82,7 @@ extern const struct gs_device_bt_const_extended CAN_btconst_ext;
 extern const struct gs_device_filter_info CAN_filter_info;
 extern const struct gs_device_tdc_const CAN_tdc_const;
 
-struct board_channel_config;
-
-void can_init(can_data_t *channel, const struct board_channel_config *config);
+void can_init(can_data_t *channel);
 
 #ifdef CONFIG_CAN_FILTER
 void can_set_filter(can_data_t *channel, const struct gs_device_filter *filter);

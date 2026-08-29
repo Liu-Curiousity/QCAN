@@ -24,7 +24,6 @@ THE SOFTWARE.
 
 */
 
-#include "board.h"
 #include "can_common.h"
 #include "config.h"
 #include "gpio_.h"

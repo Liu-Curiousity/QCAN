@@ -28,7 +28,6 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 #include "usbd_gs_can.h"
-#include "board.h"
 #include "can_common.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
@@ -55,14 +54,6 @@
 /* USER CODE BEGIN PV */
 static USBD_GS_CAN_HandleTypeDef hGS_CAN;
 static USBD_HandleTypeDef hUSB;
-
-const struct board_config config = {
-  .channel[0] = {
-    .interface = CAN_INTERFACE,
-  },
-  SET_PHY_POWER_FN(legacy_phy_power_set)
-  SET_TERMINATION_FN(legacy_termination_set)
-};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -126,7 +117,6 @@ int main(void)
   }
 
   for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
-    const struct board_channel_config *channel_config = &config.channel[i];
     can_data_t *channel = &hGS_CAN.channels[i];
 
     can_channel_set_nr(channel, i);
@@ -137,7 +127,7 @@ int main(void)
          LEDRX_GPIO_Port, LEDRX_Pin, LEDRX_Active_High,
          LEDTX_GPIO_Port, LEDTX_Pin, LEDTX_Active_High);
 
-    can_init(channel, channel_config);
+    can_init(channel);
     can_disable(&hGS_CAN, channel);
   }
 

@@ -24,7 +24,6 @@
  *
  */
 
-#include "board.h"
 #include "can_common.h"
 #include "can_drv.h"
 #include "host_frame.h"
@@ -214,14 +213,12 @@ void can_enable(struct can_channel *channel, const uint32_t feature)
 	channel->state = GS_CAN_STATE_ERROR_ACTIVE;
 	can_calc_tdco(channel);
 
-	board_phy_power_set(channel, true);
 	can_drv_enable(channel);
 }
 
 void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel)
 {
 	can_drv_disable(channel);
-	board_phy_power_set(channel, false);
 
 	usbd_gs_can_purge_from_host_list_by_channel(hcan, channel);
 	usbd_gs_can_purge_to_host_list_by_channel(hcan, channel);
