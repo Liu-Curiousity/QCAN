@@ -28,12 +28,12 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "can.h"
-#include "compiler.h"
-#include "config.h"
-#include "dfu.h"
-#include "gs_usb.h"
-#include "list.h"
+#include "../../App/Inc/can.h"
+#include "../../App/Inc/compiler.h"
+#include "../../App/Inc/config.h"
+#include "../../App/Inc/dfu.h"
+#include "../../App/Inc/gs_usb.h"
+#include "../../App/Inc/list.h"
 #include "usbd_def.h"
 
 /* Define these here so they can be referenced in other files */

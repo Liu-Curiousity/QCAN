@@ -16,7 +16,7 @@
 
 #include <stdint.h>
 
-#include "compiler.h"
+#include "../../App/Inc/compiler.h"
 
 /* DFU Class Subclass */
 #define USB_DFU_SUBCLASS 0x01
