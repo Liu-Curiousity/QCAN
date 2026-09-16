@@ -207,105 +207,49 @@ void can_drv_disable(struct can_channel *channel)
 	can->MCR |= CAN_MCR_INRQ;     // send can controller into initialization mode
 }
 
-bool can_is_rx_pending(can_data_t *channel)
-{
+bool can_is_rx_pending(can_data_t *channel) {
 	CAN_TypeDef *can = channel->instance;
 
 	return ((can->RF0R & CAN_RF0R_FMP0) != 0);
 }
 
-bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame)
-{
-	CAN_TypeDef *can = channel->instance;
+extern CAN_HandleTypeDef hcan;
 
-	if (can_is_rx_pending(channel)) {
-		CAN_FIFOMailBox_TypeDef *fifo = &can->sFIFOMailBox[0];
-
+bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame) {
+	if (HAL_CAN_GetRxFifoFillLevel(&hcan,CAN_RX_FIFO0)) {
+		CAN_RxHeaderTypeDef rx_header;
+		HAL_CAN_GetRxMessage(&hcan,CAN_RX_FIFO0, &rx_header, rx_frame->classic_can->data);
 		rx_frame->classic_can_ts->timestamp_us = timer_get();
-
-		if (fifo->RIR &  CAN_RI0R_IDE) {
-			rx_frame->can_id = CAN_EFF_FLAG | ((fifo->RIR >> 3) & 0x1FFFFFFF);
-		} else {
-			rx_frame->can_id = (fifo->RIR >> 21) & 0x7FF;
-		}
-
-		if (fifo->RIR & CAN_RI0R_RTR)  {
-			rx_frame->can_id |= CAN_RTR_FLAG;
-		}
-
-		rx_frame->can_dlc = fifo->RDTR & CAN_RDT0R_DLC;
+		rx_frame->can_dlc = rx_header.DLC;
+		rx_frame->can_id = rx_header.IDE & CAN_ID_EXT ? rx_header.ExtId : rx_header.StdId;
+		if (rx_header.IDE & CAN_ID_EXT) rx_frame->can_id |= CAN_EFF_FLAG;
+		if (rx_header.RTR & CAN_RTR_REMOTE) rx_frame->can_id |= CAN_RTR_REMOTE;
 		rx_frame->channel = can_channel_get_nr(channel);
 		rx_frame->flags = 0;
-
-		rx_frame->classic_can->data[0] = (fifo->RDLR >>  0) & 0xFF;
-		rx_frame->classic_can->data[1] = (fifo->RDLR >>  8) & 0xFF;
-		rx_frame->classic_can->data[2] = (fifo->RDLR >> 16) & 0xFF;
-		rx_frame->classic_can->data[3] = (fifo->RDLR >> 24) & 0xFF;
-		rx_frame->classic_can->data[4] = (fifo->RDHR >>  0) & 0xFF;
-		rx_frame->classic_can->data[5] = (fifo->RDHR >>  8) & 0xFF;
-		rx_frame->classic_can->data[6] = (fifo->RDHR >> 16) & 0xFF;
-		rx_frame->classic_can->data[7] = (fifo->RDHR >> 24) & 0xFF;
-
-		can->RF0R |= CAN_RF0R_RFOM0;         // release FIFO
-
 		return true;
 	} else {
 		return false;
 	}
 }
 
-static CAN_TxMailBox_TypeDef *can_find_free_mailbox(can_data_t *channel)
-{
-	CAN_TypeDef *can = channel->instance;
-	uint32_t tsr = can->TSR;
+bool can_send(can_data_t *channel, struct gs_host_frame *frame) {
+	CAN_TxHeaderTypeDef tx_header;
+	uint32_t tx_mailbox;
 
-	if (tsr & CAN_TSR_TME0) {
-		return &can->sTxMailBox[0];
-	} else if (tsr & CAN_TSR_TME1) {
-		return &can->sTxMailBox[1];
-	} else if (tsr & CAN_TSR_TME2) {
-		return &can->sTxMailBox[2];
-	} else {
-		return 0;
-	}
-}
+	tx_header.StdId = frame->can_id & 0x7FF;
+	tx_header.ExtId = frame->can_id & 0x1FFFFFFF;
+	tx_header.IDE = frame->can_id & CAN_EFF_FLAG ? CAN_ID_EXT : CAN_RTR_DATA;
+	tx_header.RTR = frame->can_id & CAN_RTR_FLAG ? CAN_RTR_REMOTE : CAN_ID_STD;
+	tx_header.DLC = frame->can_dlc;
+	tx_header.TransmitGlobalTime = DISABLE;
 
-bool can_send(can_data_t *channel, struct gs_host_frame *frame)
-{
-	CAN_TxMailBox_TypeDef *mb = can_find_free_mailbox(channel);
-
-	if (mb != 0) {
-		/* first, clear transmission request */
-		mb->TIR &= CAN_TI0R_TXRQ;
-
-		if (frame->can_id & CAN_EFF_FLAG) {         // extended id
-			mb->TIR = CAN_ID_EXT | (frame->can_id & 0x1FFFFFFF) << 3;
-		} else {
-			mb->TIR = (frame->can_id & 0x7FF) << 21;
-		}
-
-		if (frame->can_id & CAN_RTR_FLAG) {
-			mb->TIR |= CAN_RTR_REMOTE;
-		}
-
-		mb->TDTR &= 0xFFFFFFF0;
-		mb->TDTR |= frame->can_dlc & 0x0F;
-
-		mb->TDLR = (frame->classic_can->data[3] << 24) | (frame->classic_can->data[2] << 16) |
-				   (frame->classic_can->data[1] << 8) | (frame->classic_can->data[0] << 0);
-
-		mb->TDHR = (frame->classic_can->data[7] << 24) | (frame->classic_can->data[6] << 16) |
-				   (frame->classic_can->data[5] << 8) | (frame->classic_can->data[4] << 0);
-
-		/* request transmission */
-		mb->TIR |= CAN_TI0R_TXRQ;
-
+	HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(&hcan, &tx_header, frame->classic_can->data, &tx_mailbox);
+	if (status == HAL_OK) {
 		/*
 		 * struct gs_host_frame in CAN-2.0 mode doesn't use flags from
 		 * Host -> Device, so initialize here to 0.
 		 */
 		frame->flags = 0;
-
 		return true;
 	} else {
 		return false;
