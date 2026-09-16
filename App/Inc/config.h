@@ -43,7 +43,7 @@ THE SOFTWARE.
 #define CAN_QUEUE_SIZE				 (64 * NUM_CAN_CHANNEL)
 
 #define USBD_VID					 0x1d50
-#define USBD_PID_FS					 0x606f
+#define USBD_PID					 0x606f
 #define USBD_LANGID_STRING			 1033
 #define USBD_CONFIGURATION_STRING_FS GIT_HASH
 #define USBD_INTERFACE_STRING_FS	 "gs_usb interface"

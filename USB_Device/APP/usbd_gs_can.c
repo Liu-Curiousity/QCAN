@@ -831,23 +831,23 @@ static uint8_t *USBD_GS_CAN_GetCfgDesc(uint16_t *len)
 	 * in ROM.
 	 */
 	*len = sizeof(USBD_GS_CAN_CfgDesc);
-	memcpy(USBD_DescBuf, USBD_GS_CAN_CfgDesc, sizeof(USBD_GS_CAN_CfgDesc));
-	BUILD_BUG_ON(sizeof(USBD_GS_CAN_CfgDesc) >= sizeof(USBD_DescBuf));
+	memcpy(USBD_StrDesc, USBD_GS_CAN_CfgDesc, sizeof(USBD_GS_CAN_CfgDesc));
+	BUILD_BUG_ON(sizeof(USBD_GS_CAN_CfgDesc) >= sizeof(USBD_StrDesc));
 
-	return USBD_DescBuf;
+	return USBD_StrDesc;
 }
 
 uint8_t *USBD_GS_CAN_GetStrDesc(USBD_HandleTypeDef *pdev, uint8_t index, uint16_t *length)
 {
 	switch (index) {
 		case DFU_INTERFACE_STR_INDEX:
-			USBD_GetString((uint8_t *)DFU_INTERFACE_STRING_FS, USBD_DescBuf, length);
-			return USBD_DescBuf;
+			USBD_GetString((uint8_t *)DFU_INTERFACE_STRING_FS, USBD_StrDesc, length);
+			return USBD_StrDesc;
 		case 0xEE:
 			*length = sizeof(USBD_GS_CAN_WINUSB_STR);
-			memcpy(USBD_DescBuf, USBD_GS_CAN_WINUSB_STR, sizeof(USBD_GS_CAN_WINUSB_STR));
-			BUILD_BUG_ON(sizeof(USBD_GS_CAN_WINUSB_STR) >= sizeof(USBD_DescBuf));
-			return USBD_DescBuf;
+			memcpy(USBD_StrDesc, USBD_GS_CAN_WINUSB_STR, sizeof(USBD_GS_CAN_WINUSB_STR));
+			BUILD_BUG_ON(sizeof(USBD_GS_CAN_WINUSB_STR) >= sizeof(USBD_StrDesc));
+			return USBD_StrDesc;
 		default:
 			*length = 0;
 			USBD_CtlError(pdev, 0);
@@ -882,15 +882,15 @@ bool USBD_GS_CAN_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqType
 	if (req->bRequest == USBD_GS_CAN_VENDOR_CODE) {
 		switch (req->wIndex) {
 			case 0x0004:
-				memcpy(USBD_DescBuf, USBD_MS_COMP_ID_FEATURE_DESC, sizeof(USBD_MS_COMP_ID_FEATURE_DESC));
-				BUILD_BUG_ON(sizeof(USBD_MS_COMP_ID_FEATURE_DESC) >= sizeof(USBD_DescBuf));
-				USBD_CtlSendData(pdev, USBD_DescBuf, MIN(sizeof(USBD_MS_COMP_ID_FEATURE_DESC), req->wLength));
+				memcpy(USBD_StrDesc, USBD_MS_COMP_ID_FEATURE_DESC, sizeof(USBD_MS_COMP_ID_FEATURE_DESC));
+				BUILD_BUG_ON(sizeof(USBD_MS_COMP_ID_FEATURE_DESC) >= sizeof(USBD_StrDesc));
+				USBD_CtlSendData(pdev, USBD_StrDesc, MIN(sizeof(USBD_MS_COMP_ID_FEATURE_DESC), req->wLength));
 				return true;
 			case 0x0005:
 				if (req->wValue == 0) { // only return our GUID for interface #0
-					memcpy(USBD_DescBuf, USBD_MS_EXT_PROP_FEATURE_DESC, sizeof(USBD_MS_EXT_PROP_FEATURE_DESC));
-					BUILD_BUG_ON(sizeof(USBD_MS_EXT_PROP_FEATURE_DESC) >= sizeof(USBD_DescBuf));
-					USBD_CtlSendData(pdev, USBD_DescBuf, MIN(sizeof(USBD_MS_EXT_PROP_FEATURE_DESC), req->wLength));
+					memcpy(USBD_StrDesc, USBD_MS_EXT_PROP_FEATURE_DESC, sizeof(USBD_MS_EXT_PROP_FEATURE_DESC));
+					BUILD_BUG_ON(sizeof(USBD_MS_EXT_PROP_FEATURE_DESC) >= sizeof(USBD_StrDesc));
+					USBD_CtlSendData(pdev, USBD_StrDesc, MIN(sizeof(USBD_MS_EXT_PROP_FEATURE_DESC), req->wLength));
 					return true;
 				}
 				break;

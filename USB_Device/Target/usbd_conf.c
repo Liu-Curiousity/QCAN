@@ -70,6 +70,7 @@ static void PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
+  /* USER CODE BEGIN HAL_PCD_SetupStageCallback_PreTreatment */
 	USBD_HandleTypeDef *pdev = hpcd->pData;
 	USBD_ParseSetupRequest(&pdev->request, (uint8_t *)hpcd->Setup);
 
@@ -82,10 +83,9 @@ void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE) { // interface request
 		request_was_handled = USBD_GS_CAN_CustomInterfaceRequest(pdev, &pdev->request);
 	}
-
-	if (!request_was_handled) {
-		USBD_LL_SetupStage((USBD_HandleTypeDef*)hpcd->pData, (uint8_t *)hpcd->Setup);
-	}
+  if (request_was_handled) return;
+  /* USER CODE END  HAL_PCD_SetupStageCallback_PreTreatment */
+  USBD_LL_SetupStage((USBD_HandleTypeDef*)hpcd->pData, (uint8_t *)hpcd->Setup);
   /* USER CODE BEGIN HAL_PCD_SetupStageCallback_PostTreatment */
 
   /* USER CODE END  HAL_PCD_SetupStageCallback_PostTreatment */
@@ -295,7 +295,7 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
 	HAL_PCDEx_SetTxFiFo(pdev->pData, 1U, 64U / 4U);     // 0x81, 64 bytes (div by 4 for words)
 #endif
 
-	return USBD_OK;
+  return USBD_OK;
 }
 
 /**
