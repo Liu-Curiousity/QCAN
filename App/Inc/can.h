@@ -53,7 +53,7 @@ enum can_channel_flag {
 
 typedef struct can_channel {
 #if defined (CONFIG_BXCAN)
-	CAN_TypeDef *instance;
+	CAN_HandleTypeDef *hcan;
 #elif defined(CONFIG_M_CAN)
 	FDCAN_HandleTypeDef channel;
 #endif

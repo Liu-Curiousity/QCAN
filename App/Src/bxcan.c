@@ -90,27 +90,9 @@ static void rcc_reset(CAN_TypeDef *instance)
 #endif
 }
 
-void device_can_init(can_data_t *channel)
-{
-	__HAL_RCC_CAN1_CLK_ENABLE();
-
-	GPIO_InitTypeDef itd = {
-		.Pin = GPIO_PIN_8 | GPIO_PIN_9,
-		.Mode = GPIO_MODE_AF_PP,
-		.Pull = GPIO_NOPULL,
-		.Speed = GPIO_SPEED_FREQ_HIGH,
-		.Alternate = GPIO_AF4_CAN,
-	};
-	HAL_GPIO_Init(GPIOB, &itd);
-
-	channel->instance = CAN;
-}
-
 void can_init(can_data_t *channel)
 {
 	struct gs_device_filter_bxcan *filter = &channel->filter.bxcan;
-
-	device_can_init(channel);
 
 	filter->fs1r = 0x1;     // 32-bit for filter bank 0
 	filter->fm1r = 0x0;     // Mask mode for filter 0
@@ -128,7 +110,7 @@ void can_set_filter(can_data_t *channel, const struct gs_device_filter *filter)
 static bool can_apply_filter(const can_data_t *channel)
 {
 	const struct gs_device_filter_bxcan *filter = &channel->filter.bxcan;
-	CAN_TypeDef *can = channel->instance;
+	CAN_TypeDef *can = channel->hcan->Instance;
 
 	// disable filter configuration
 	can->FMR |= CAN_FMR_FINIT;
@@ -159,7 +141,7 @@ static bool can_apply_filter(const can_data_t *channel)
 void can_drv_enable(struct can_channel *channel)
 {
 	const uint32_t feature = channel->feature;
-	CAN_TypeDef *can = channel->instance;
+	CAN_TypeDef *can = channel->hcan->Instance;
 
 	uint32_t mcr = CAN_MCR_INRQ | CAN_MCR_TXFP;
 
@@ -202,23 +184,19 @@ void can_drv_enable(struct can_channel *channel)
 
 void can_drv_disable(struct can_channel *channel)
 {
-	CAN_TypeDef *can = channel->instance;
-
-	can->MCR |= CAN_MCR_INRQ;     // send can controller into initialization mode
+	HAL_CAN_Stop(channel->hcan);
 }
 
 bool can_is_rx_pending(can_data_t *channel) {
-	CAN_TypeDef *can = channel->instance;
+	CAN_TypeDef *can = channel->hcan->Instance;
 
 	return ((can->RF0R & CAN_RF0R_FMP0) != 0);
 }
 
-extern CAN_HandleTypeDef hcan;
-
 bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame) {
-	if (HAL_CAN_GetRxFifoFillLevel(&hcan,CAN_RX_FIFO0)) {
+	if (HAL_CAN_GetRxFifoFillLevel(channel->hcan,CAN_RX_FIFO0)) {
 		CAN_RxHeaderTypeDef rx_header;
-		HAL_CAN_GetRxMessage(&hcan,CAN_RX_FIFO0, &rx_header, rx_frame->classic_can->data);
+		HAL_CAN_GetRxMessage(channel->hcan,CAN_RX_FIFO0, &rx_header, rx_frame->classic_can->data);
 		rx_frame->classic_can_ts->timestamp_us = timer_get();
 		rx_frame->can_dlc = rx_header.DLC;
 		rx_frame->can_id = rx_header.IDE & CAN_ID_EXT ? rx_header.ExtId : rx_header.StdId;
@@ -243,7 +221,7 @@ bool can_send(can_data_t *channel, struct gs_host_frame *frame) {
 	tx_header.DLC = frame->can_dlc;
 	tx_header.TransmitGlobalTime = DISABLE;
 
-	HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(&hcan, &tx_header, frame->classic_can->data, &tx_mailbox);
+	HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(channel->hcan, &tx_header, frame->classic_can->data, &tx_mailbox);
 	if (status == HAL_OK) {
 		/*
 		 * struct gs_host_frame in CAN-2.0 mode doesn't use flags from
@@ -266,11 +244,11 @@ bool can_drv_bus_error_pending(const struct can_channel *channel)
 
 void can_drv_read_reg_status(struct can_channel *channel)
 {
-	channel->reg_status.esr = channel->instance->ESR;
+	channel->reg_status.esr = channel->hcan->Instance->ESR;
 
 	if (can_drv_bus_error_pending(channel)) {
 		/* mark as handled by software */
-		channel->instance->ESR |= FIELD_PREP(CAN_ESR_LEC, CAN_LEC_SOFTWARE);
+		channel->hcan->Instance->ESR |= FIELD_PREP(CAN_ESR_LEC, CAN_LEC_SOFTWARE);
 	}
 }
 
