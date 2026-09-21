@@ -15,8 +15,7 @@
 #define ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H
 
 #include <stdint.h>
-
-#include "../../App/Inc/compiler.h"
+#include <usbd_def.h>
 
 /* DFU Class Subclass */
 #define USB_DFU_SUBCLASS 0x01
@@ -93,5 +92,7 @@ enum usb_dfu_state {
 	DFU_ERROR       = 10,
 	DFU_STATE_MAX       = 11,
 };
+
+uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 
 #endif /* ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H */

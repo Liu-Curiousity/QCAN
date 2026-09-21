@@ -24,8 +24,9 @@
 #include "usbd_def.h"
 #include "usbd_core.h"
 
-#include "usbd_gs_can.h"
 #include "usb.h"
+#include "usbd_cdc_if.h"
+#include "usbd_gs_can.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -77,11 +78,11 @@ void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 	bool request_was_handled = false;
 
 	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE) { // device request
-		request_was_handled = USBD_GS_CAN_CustomDeviceRequest(pdev, &pdev->request);
+		request_was_handled = USBD_CustomDeviceRequest(pdev, &pdev->request);
 	}
 
 	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE) { // interface request
-		request_was_handled = USBD_GS_CAN_CustomInterfaceRequest(pdev, &pdev->request);
+		request_was_handled = USBD_CustomInterfaceRequest(pdev, &pdev->request);
 	}
   if (request_was_handled) return;
   /* USER CODE END  HAL_PCD_SetupStageCallback_PreTreatment */

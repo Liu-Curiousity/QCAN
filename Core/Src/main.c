@@ -27,10 +27,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_gs_can.h"
+#include "usbd_composite.h"
 #include "can_common.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
+#include "usbd_gs_can.h"
 
 /* USER CODE END Includes */
 
@@ -52,7 +53,7 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static USBD_GS_CAN_HandleTypeDef hGS_CAN;
+static USBD_COMPOSITE_HandleTypeDef hGS_CAN;
 static USBD_HandleTypeDef hUSB;
 /* USER CODE END PV */
 
@@ -132,8 +133,8 @@ int main(void)
   }
 
   USBD_Init(&hUSB, (USBD_DescriptorsTypeDef *)&FS_Desc, DEVICE_FS);
-  USBD_RegisterClass(&hUSB, &USBD_GS_CAN);
-  USBD_GS_CAN_Init(&hGS_CAN, &hUSB);
+  USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
+  USBD_GS_CAN_Init_(&hGS_CAN, &hUSB);
   USBD_Start(&hUSB);
 
   /* nice wake-up pattern */

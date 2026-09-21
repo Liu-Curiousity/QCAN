@@ -27,7 +27,6 @@
 
 #include "can.h"
 #include "config.h"
-#include "usbd_gs_can.h"
 
 static inline uint8_t
 gs_host_frame_object_get_channel_nr(const struct gs_host_frame_object *frame_object)
@@ -39,7 +38,7 @@ gs_host_frame_object_get_channel_nr(const struct gs_host_frame_object *frame_obj
 }
 
 static inline can_data_t *
-gs_host_frame_object_get_channel(USBD_GS_CAN_HandleTypeDef *hcan,
+gs_host_frame_object_get_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
 								 const struct gs_host_frame_object *frame_object)
 {
 	const uint8_t channel_nr = gs_host_frame_object_get_channel_nr(frame_object);
@@ -49,7 +48,7 @@ gs_host_frame_object_get_channel(USBD_GS_CAN_HandleTypeDef *hcan,
 
 static inline
 struct gs_host_frame_object *
-gs_host_frame_object_get_locked(USBD_GS_CAN_HandleTypeDef *hcan)
+gs_host_frame_object_get_locked(USBD_COMPOSITE_HandleTypeDef *hcan)
 {
 	struct gs_host_frame_object *frame_object;
 

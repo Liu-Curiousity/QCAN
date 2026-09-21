@@ -29,7 +29,7 @@
 #include "host_frame.h"
 #include "led.h"
 #include "timer.h"
-#include "usbd_gs_can.h"
+#include "usbd_composite.h"
 
 #define CAN_ERROR_WARNING_THRESHOLD	 96
 #define CAN_ERROR_PASSIVE_THRESHOLD	 128
@@ -216,7 +216,7 @@ void can_enable(struct can_channel *channel, const uint32_t feature)
 	can_drv_enable(channel);
 }
 
-void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel)
+void can_disable(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel)
 {
 	can_drv_disable(channel);
 
@@ -232,7 +232,7 @@ void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel)
 	led_set_mode(&channel->leds, LED_MODE_OFF);
 }
 
-void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel)
+void CAN_SendFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel)
 {
 	struct gs_host_frame_object *frame_object;
 
@@ -267,7 +267,7 @@ void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel)
 	led_indicate_trx(&channel->leds, LED_TX);
 }
 
-void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel)
+void CAN_ReceiveFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel)
 {
 	struct gs_host_frame_object *frame_object;
 
@@ -381,7 +381,7 @@ void can_lec_error_to_frame(struct gs_host_frame *frame, const uint8_t lec)
 	}
 }
 
-static void can_handle_bus_error(USBD_GS_CAN_HandleTypeDef *hcan, const struct can_channel *channel)
+static void can_handle_bus_error(USBD_COMPOSITE_HandleTypeDef *hcan, const struct can_channel *channel)
 {
 	struct gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(hcan);
 	if (!frame_object)
@@ -421,7 +421,7 @@ void can_schedule_bus_off_recovery(struct can_channel *channel, const uint32_t d
 		channel->bus_off_restart++;
 }
 
-static void can_handle_state_change(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel)
+static void can_handle_state_change(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel)
 {
 	struct gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(hcan);
 	if (!frame_object)
@@ -459,7 +459,7 @@ static bool can_state_change_pending(struct can_channel *channel)
 	return true;
 }
 
-static void can_handle_bus_off_recovery(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel)
+static void can_handle_bus_off_recovery(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel)
 {
 	can_drv_handle_bus_off_recovery(channel);
 
@@ -491,7 +491,7 @@ static bool can_bus_off_recovery_pending(const struct can_channel *channel)
 // best we can localize the errors to is "after the last successfully
 // received frame", so wait until we get there. LEC will hold some error
 // to report even if multiple pass by.
-void CAN_HandleError(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel)
+void CAN_HandleError(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel)
 {
 	if (can_is_rx_pending(channel)) {
 		return;

@@ -15,7 +15,7 @@ static bool tx_busy, tx_zlp;
 static uint8_t alternate_setting;
 static uint16_t interface_status;
 
-uint8_t QCAN_CDC_Init(USBD_HandleTypeDef *pdev)
+uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev)
 {
     static const uint8_t defaults[7] = {0x00, 0xc2, 0x01, 0x00, 0, 0, 8};
     memcpy(line_coding, defaults, sizeof(line_coding)); /* 115200 8N1 */
@@ -35,11 +35,11 @@ uint8_t QCAN_CDC_Init(USBD_HandleTypeDef *pdev)
     device = pdev;
     return USBD_OK;
 fail:
-    QCAN_CDC_DeInit(pdev);
+    USBD_CDC_DeInit(pdev);
     return USBD_FAIL;
 }
 
-void QCAN_CDC_DeInit(USBD_HandleTypeDef *pdev)
+void USBD_CDC_DeInit(USBD_HandleTypeDef *pdev)
 {
     device = NULL;
     USBD_LL_CloseEP(pdev, CDC_IN_EP);
@@ -52,7 +52,7 @@ void QCAN_CDC_DeInit(USBD_HandleTypeDef *pdev)
     tx_busy = tx_zlp = false;
 }
 
-uint8_t QCAN_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
+uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
     if (pdev->dev_state != USBD_STATE_CONFIGURED)
         goto fail;
@@ -91,7 +91,7 @@ fail:
     return USBD_FAIL;
 }
 
-uint8_t QCAN_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
+uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
 {
     if (pdev->request.bmRequest != 0x21 || pdev->request.bRequest != 0x20 ||
         pdev->request.wIndex != CDC_CONTROL_INTERFACE || pdev->request.wLength != 7)
@@ -100,7 +100,7 @@ uint8_t QCAN_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
     return USBD_OK;
 }
 
-uint8_t QCAN_CDC_DataOut(USBD_HandleTypeDef *pdev)
+uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
     rx_offset = 0;
     rx_length = (uint16_t)USBD_LL_GetRxDataSize(pdev, CDC_OUT_EP);
@@ -154,7 +154,7 @@ uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length)
     return result;
 }
 
-uint8_t QCAN_CDC_DataIn(USBD_HandleTypeDef *pdev)
+uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
     if (tx_zlp) {
         tx_zlp = false;

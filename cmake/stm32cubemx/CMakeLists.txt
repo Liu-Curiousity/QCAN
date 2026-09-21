@@ -22,7 +22,9 @@ set(MX_Include_Dirs
 
 # STM32CubeMX generated application sources
 set(MX_Application_Src
+	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_dfu.c
 	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_gs_can.c
+	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_composite.c
 	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_cdc_if.c
 	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_desc.c
 	${CMAKE_SOURCE_DIR}/USB_Device/Target/usbd_conf.c
