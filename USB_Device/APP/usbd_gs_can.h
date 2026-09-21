@@ -35,6 +35,7 @@
 #include "../../App/Inc/gs_usb.h"
 #include "../../App/Inc/list.h"
 #include "usbd_def.h"
+#include "usbd_cdc_if.h"
 
 /* Define these here so they can be referenced in other files */
 
@@ -43,7 +44,7 @@
 #else
 #define CAN_DATA_MAX_PACKET_SIZE 32    /* Endpoint IN & OUT Packet size */
 #endif
-#define USB_CAN_CONFIG_DESC_SIZ	 50
+#define USB_CAN_CONFIG_DESC_SIZ	 (50U + CDC_CONFIG_DESC_SIZE)
 #define USBD_GS_CAN_VENDOR_CODE	 0x20
 #define DFU_INTERFACE_NUM		 1
 #define DFU_INTERFACE_STR_INDEX	 0xE0

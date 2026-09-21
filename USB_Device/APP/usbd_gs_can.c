@@ -57,7 +57,7 @@ static const uint8_t USBD_GS_CAN_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] =
 	USB_DESC_TYPE_CONFIGURATION,      /* bDescriptorType */
 	USB_CAN_CONFIG_DESC_SIZ,          /* wTotalLength */
 	0x00,
-	0x02,                             /* bNumInterfaces */
+	0x04,                             /* bNumInterfaces */
 	0x01,                             /* bConfigurationValue */
 	USBD_IDX_CONFIG_STR,              /* iConfiguration */
 	0x80,                             /* bmAttributes */
@@ -121,6 +121,18 @@ static const uint8_t USBD_GS_CAN_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] =
 	0xFF, 0x00,                       /* wDetachTimeOut */
 	0x00, 0x08,                       /* wTransferSize */
 	0x1a, 0x01,                       /* bcdDFUVersion: 1.1a */
+
+	/* CDC ACM: IAD groups interfaces 2 (control) and 3 (data). */
+	8, 0x0b, CDC_CONTROL_INTERFACE, 2, 0x02, 0x02, 0x01, 0,
+	9, USB_DESC_TYPE_INTERFACE, CDC_CONTROL_INTERFACE, 0, 1, 0x02, 0x02, 0x01, 0,
+	5, 0x24, 0x00, 0x10, 0x01, /* CDC header, version 1.10 */
+	5, 0x24, 0x01, 0x00, CDC_DATA_INTERFACE, /* Call management */
+	4, 0x24, 0x02, 0x02, /* ACM: line coding and control line state */
+	5, 0x24, 0x06, CDC_CONTROL_INTERFACE, CDC_DATA_INTERFACE, /* Union */
+	7, USB_DESC_TYPE_ENDPOINT, CDC_CMD_EP, 0x03, CDC_CMD_PACKET_SIZE, 0, 16,
+	9, USB_DESC_TYPE_INTERFACE, CDC_DATA_INTERFACE, 0, 2, 0x0a, 0, 0, 0,
+	7, USB_DESC_TYPE_ENDPOINT, CDC_OUT_EP, 0x02, CDC_PACKET_SIZE, 0, 0,
+	7, USB_DESC_TYPE_ENDPOINT, CDC_IN_EP, 0x02, CDC_PACKET_SIZE, 0, 0,
 
 };
 
@@ -295,6 +307,11 @@ static uint8_t USBD_GS_CAN_Start(USBD_HandleTypeDef *pdev, uint8_t __maybe_unuse
 	USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_OUT, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
 	USBD_GS_CAN_PrepareReceive(pdev);
 
+	if (QCAN_CDC_Init(pdev) != USBD_OK) {
+		USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
+		USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_OUT);
+		return USBD_FAIL;
+	}
 	return USBD_OK;
 }
 
@@ -307,6 +324,7 @@ static uint8_t USBD_GS_CAN_DeInit(USBD_HandleTypeDef *pdev, uint8_t __maybe_unus
 
 	USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
 	USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_OUT);
+	QCAN_CDC_DeInit(pdev);
 
 	return USBD_OK;
 }
@@ -537,6 +555,9 @@ static uint8_t USBD_GS_CAN_Vendor_Request(USBD_HandleTypeDef *pdev, USBD_SetupRe
 static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
 	static uint8_t ifalt = 0;
+	if ((req->bmRequest & 0x1f) == USB_REQ_RECIPIENT_INTERFACE &&
+		(req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE))
+		return QCAN_CDC_Setup(pdev, req);
 
 	switch (req->bmRequest & USB_REQ_TYPE_MASK) {
 		case USB_REQ_TYPE_CLASS:
@@ -568,6 +589,10 @@ static const led_seq_step_t led_identify_seq[] = {
 };
 
 static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
+	if ((pdev->request.bmRequest & 0x1f) == USB_REQ_RECIPIENT_INTERFACE &&
+		(pdev->request.wIndex == CDC_CONTROL_INTERFACE ||
+		 pdev->request.wIndex == CDC_DATA_INTERFACE))
+		return QCAN_CDC_EP0_RxReady(pdev);
 
 	USBD_GS_CAN_HandleTypeDef *hcan = pdev->pClassData;
 	can_data_t *channel = NULL;
@@ -705,6 +730,10 @@ out_fail:
 
 static uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t __maybe_unused epnum)
 {
+	if (epnum == (CDC_IN_EP & 0x7f))
+		return QCAN_CDC_DataIn(pdev);
+	if (epnum != (GSUSB_ENDPOINT_IN & 0x7f))
+		return USBD_OK;
 	USBD_GS_CAN_HandleTypeDef *hcan = pdev->pClassData;
 
 	bool was_irq_enabled = disable_irq();
@@ -746,6 +775,10 @@ static bool USBD_GS_Prefill_RX_Buffers(USBD_GS_CAN_HandleTypeDef *hcan)
 
 // Note that the return value is completely ignored by the stack.
 static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+	if (epnum == CDC_OUT_EP)
+		return QCAN_CDC_DataOut(pdev);
+	if (epnum != GSUSB_ENDPOINT_OUT)
+		return USBD_OK;
 	USBD_GS_CAN_HandleTypeDef *hcan = pdev->pClassData;
 	can_data_t *channel;
 
@@ -879,7 +912,8 @@ uint8_t USBD_GS_CAN_Init(USBD_GS_CAN_HandleTypeDef *hcan, USBD_HandleTypeDef *pd
 
 bool USBD_GS_CAN_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
-	if (req->bRequest == USBD_GS_CAN_VENDOR_CODE) {
+	/* CDC SET_LINE_CODING also uses request 0x20. Only intercept vendor IN. */
+	if ((req->bmRequest & 0xe0) == 0xc0 && req->bRequest == USBD_GS_CAN_VENDOR_CODE) {
 		switch (req->wIndex) {
 			case 0x0004:
 				memcpy(USBD_StrDesc, USBD_MS_COMP_ID_FEATURE_DESC, sizeof(USBD_MS_COMP_ID_FEATURE_DESC));
