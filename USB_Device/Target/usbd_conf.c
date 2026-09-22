@@ -252,7 +252,7 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   /* Link the driver to the stack. */
   pdev->pData = &hpcd_USB_FS;
 
-	hpcd_USB_FS.Instance = USB_INTERFACE;
+	hpcd_USB_FS.Instance = USB;
 	hpcd_USB_FS.Init.dev_endpoints = 5U;
 	hpcd_USB_FS.Init.speed = PCD_SPEED_FULL;
 	hpcd_USB_FS.Init.ep0_mps = EP_MPS_64;

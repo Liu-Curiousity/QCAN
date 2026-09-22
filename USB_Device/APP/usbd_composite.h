@@ -37,7 +37,6 @@
 #include "list.h"
 
 /* Define these here so they can be referenced in other files */
-
 #ifdef CONFIG_CANFD
 #define CAN_DATA_MAX_PACKET_SIZE 64    /* Endpoint IN & OUT Packet size */
 #else
@@ -65,6 +64,7 @@ extern USBD_ClassTypeDef USBD_COMPOSITE;
 
 struct gs_host_frame_object {
 	struct list_head list;
+
 	union {
 		uint8_t _buf[GS_HOST_FRAME_SIZE];
 		struct gs_host_frame frame;
@@ -109,19 +109,10 @@ typedef struct {
 	bool dfu_detach_requested;
 } USBD_COMPOSITE_HandleTypeDef __attribute__ ((aligned (4)));
 
-#if defined(STM32F0)
-# define USB_INTERFACE USB
-# define USB_INTERRUPT USB_IRQn
-#elif defined(STM32F4)
-# define USB_INTERFACE USB_OTG_FS
-# define USB_INTERRUPT OTG_FS_IRQn
-
+#if defined(STM32F4)
 // RX FIFO is defined in words, so divide bytes by 4
 // RX FIFO size chosen according to reference manual RM0368 which suggests
 // using (largest packet size / 4) + 1
 # define USB_RX_FIFO_SIZE ((256U / 4U) + 1U)
-#elif defined(STM32G0)
-# define USB_INTERFACE	  USB_DRD_FS
-# define USB_INTERRUPT	  USB_UCPD1_2_IRQn
 #endif
 

@@ -441,7 +441,8 @@ static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	can_data_t *channel;
 
 	/* If we do not have a valid incoming frame pointer, something broke. */
-	assert_basic(hcan->from_host_buf[0]);
+	if (!hcan->from_host_buf[0])
+		__BKPT(0);
 
 	uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
 	if (rxlen < (struct_size(&hcan->from_host_buf[0]->frame, classic_can, 1))) {
