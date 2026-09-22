@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "can.h"
+#include "bxcan.h"
 #include "i2c.h"
 #include "tim.h"
 #include "usart.h"
@@ -120,7 +120,7 @@ int main(void)
   for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
     can_data_t *channel = &hGS_CAN.channels[i];
 
-    can_channel_set_nr(channel, i);
+    channel->nr = i;
 
     INIT_LIST_HEAD(&channel->list_from_host);
 

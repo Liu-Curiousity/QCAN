@@ -36,12 +36,8 @@ bool USBD_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 
 bool USBD_GS_CAN_DfuDetachRequested(USBD_HandleTypeDef *pdev);
 
-
-void usbd_gs_can_purge_from_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
-                                                 struct can_channel *channel);
-
-void usbd_gs_can_purge_to_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
-                                               const struct can_channel *channel);
+void usbd_gs_can_purge_from_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel);
+void usbd_gs_can_purge_to_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan, const struct can_channel *channel);
 
 #ifdef __cplusplus
 };

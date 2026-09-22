@@ -28,7 +28,7 @@
 
 #include <stdint.h>
 
-#include "can.h"
+#include "bxcan.h"
 #include "usbd_composite.h"
 
 #define CAN_LEC_NO_ERROR	0
@@ -41,67 +41,11 @@
 #define CAN_LEC_SOFTWARE	7
 
 bool can_check_bittiming_ok(const struct can_bittiming_const *btc, const struct gs_device_bittiming *timing);
-void can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *bt);
-
-#ifdef CONFIG_CANFD
-void can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
-bool can_check_tdc_ok(const struct gs_device_tdc_const *tdc_const, const struct gs_device_tdc *tdc);
-void can_set_tdc(struct can_channel *channel, const struct gs_device_tdc *tdc);
-void can_get_device_tdc(const struct can_channel *channel, struct gs_device_tdc *tdc);
-#else
-static inline void can_set_data_bittiming(struct can_channel __maybe_unused *channel,
-										  const struct gs_device_bittiming __maybe_unused *timing)
-{
-}
-
-static inline bool can_check_tdc_ok(const struct gs_device_tdc_const __maybe_unused *tdc_const,
-									const struct gs_device_tdc __maybe_unused *tdc)
-{
-	return false;
-}
-
-static inline void can_set_tdc(struct can_channel __maybe_unused *channel,
-							   const struct gs_device_tdc __maybe_unused *tdc)
-{
-}
-
-static inline void can_get_device_tdc(const struct can_channel __maybe_unused *channel,
-									  struct gs_device_tdc __maybe_unused *tdc)
-{
-}
-#endif
-
-#if (NUM_CAN_CHANNEL > 1)
-static inline void can_channel_set_nr(can_data_t *channel, const uint8_t nr)
-{
-	channel->nr = nr;
-}
-
-static inline uint8_t can_channel_get_nr(const can_data_t *channel)
-{
-	return channel->nr;
-}
-#else
-static inline void can_channel_set_nr(can_data_t __maybe_unused *channel, const uint8_t __maybe_unused nr)
-{
-}
-
-static inline uint8_t can_channel_get_nr(const can_data_t __maybe_unused *channel)
-{
-	return 0;
-}
-#endif
-
-static inline bool can_is_lec_error(const uint8_t lec)
-{
-	if (lec == CAN_LEC_NO_ERROR || lec == CAN_LEC_SOFTWARE)
-		return false;
-
-	return true;
-}
+bool can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
+bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
 
 bool can_is_enabled(const struct can_channel *channel);
-void can_enable(struct can_channel *channel, uint32_t mode);
+bool can_enable(struct can_channel *channel, uint32_t feature);
 void can_disable(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel);
 void can_get_device_state(const struct can_channel *channel, struct gs_device_state *state);
 

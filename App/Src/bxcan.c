@@ -25,8 +25,8 @@
  */
 
 #include "can.h"
+#include "bxcan.h"
 #include "can_common.h"
-#include "can_drv.h"
 #include "config.h"
 #include "gs_usb.h"
 #include "timer.h"
@@ -86,7 +86,7 @@ static void rcc_reset(CAN_TypeDef *instance)
 	}
 #endif
 }
-extern CAN_HandleTypeDef hcan;
+
 void can_init(can_data_t *channel)
 {
 	channel->hcan = &hcan;
@@ -148,8 +148,7 @@ void can_drv_enable(struct can_channel *channel)
 	HAL_CAN_Start(channel->hcan);
 }
 
-void can_drv_disable(struct can_channel *channel)
-{
+void can_drv_disable(struct can_channel *channel) {
 	HAL_CAN_Stop(channel->hcan);
 }
 
@@ -168,7 +167,7 @@ bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame) {
 		rx_frame->can_id = rx_header.IDE & CAN_ID_EXT ? rx_header.ExtId : rx_header.StdId;
 		if (rx_header.IDE & CAN_ID_EXT) rx_frame->can_id |= CAN_EFF_FLAG;
 		if (rx_header.RTR & CAN_RTR_REMOTE) rx_frame->can_id |= CAN_RTR_REMOTE;
-		rx_frame->channel = can_channel_get_nr(channel);
+		rx_frame->channel = channel->nr;
 		rx_frame->flags = 0;
 		return true;
 	} else {
@@ -187,29 +186,25 @@ bool can_send(can_data_t *channel, struct gs_host_frame *frame) {
 	tx_header.DLC = frame->can_dlc;
 	tx_header.TransmitGlobalTime = DISABLE;
 
-	HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(channel->hcan, &tx_header, frame->classic_can->data, &tx_mailbox);
-	if (status == HAL_OK) {
-		/*
-		 * struct gs_host_frame in CAN-2.0 mode doesn't use flags from
-		 * Host -> Device, so initialize here to 0.
-		 */
-		frame->flags = 0;
-		return true;
-	} else {
-		return false;
-	}
+	const HAL_StatusTypeDef status = HAL_CAN_AddTxMessage(channel->hcan, &tx_header, frame->classic_can->data, &tx_mailbox);
+	return status == HAL_OK ? true : false;
 }
 
-bool can_drv_bus_error_pending(const struct can_channel *channel)
-{
+static inline bool can_is_lec_error(const uint8_t lec) {
+	if (lec == CAN_LEC_NO_ERROR || lec == CAN_LEC_SOFTWARE)
+		return false;
+
+	return true;
+}
+
+bool can_drv_bus_error_pending(const struct can_channel *channel) {
 	const uint32_t reg_esr = channel->reg_status.esr;
 	const uint8_t lec = FIELD_GET(CAN_ESR_LEC, reg_esr);
 
 	return can_is_lec_error(lec);
 }
 
-void can_drv_read_reg_status(struct can_channel *channel)
-{
+void can_drv_read_reg_status(struct can_channel *channel) {
 	channel->reg_status.esr = channel->hcan->Instance->ESR;
 
 	if (can_drv_bus_error_pending(channel)) {
@@ -218,8 +213,7 @@ void can_drv_read_reg_status(struct can_channel *channel)
 	}
 }
 
-bool can_drv_handle_bus_error(const struct can_channel *channel, struct gs_host_frame *frame)
-{
+bool can_drv_handle_bus_error(const struct can_channel *channel, struct gs_host_frame *frame) {
 	const uint32_t reg_esr = channel->reg_status.esr;
 
 	const uint8_t tx_err = FIELD_GET(CAN_ESR_TEC, reg_esr);
@@ -239,8 +233,7 @@ bool can_drv_handle_bus_error(const struct can_channel *channel, struct gs_host_
 	return true;
 }
 
-enum gs_can_state can_drv_get_state(const struct can_channel *channel)
-{
+enum gs_can_state can_drv_get_state(const struct can_channel *channel) {
 	const uint32_t reg_esr = channel->reg_status.esr;
 
 	if (!(reg_esr & (CAN_ESR_BOFF | CAN_ESR_EPVF | CAN_ESR_EWGF))) {
@@ -258,17 +251,7 @@ enum gs_can_state can_drv_get_state(const struct can_channel *channel)
 	return GS_CAN_STATE_ERROR_WARNING;
 }
 
-void can_drv_get_device_state(const struct can_channel *channel, struct gs_device_state *state)
-{
-	const uint32_t reg_esr = channel->reg_status.esr;
-
-	state->state = can_drv_get_state(channel);
-	state->rxerr = FIELD_GET(CAN_ESR_REC, reg_esr);
-	state->txerr = FIELD_GET(CAN_ESR_TEC, reg_esr);
-}
-
-void can_drv_handle_state_change(const struct can_channel *channel, struct gs_host_frame *frame)
-{
+void can_drv_handle_state_change(const struct can_channel *channel, struct gs_host_frame *frame) {
 	const uint32_t reg_esr = channel->reg_status.esr;
 
 	const uint8_t tx_err = FIELD_GET(CAN_ESR_TEC, reg_esr);
@@ -286,8 +269,7 @@ void can_drv_handle_state_change(const struct can_channel *channel, struct gs_ho
 	}
 }
 
-void can_drv_handle_bus_off_recovery(struct can_channel *channel)
-{
+void can_drv_handle_bus_off_recovery(struct can_channel *channel) {
 	can_drv_disable(channel);
 	can_drv_enable(channel);
 }

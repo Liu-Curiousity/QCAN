@@ -3,21 +3,14 @@
 #include <string.h>
 #include <usbd_core.h>
 
-#include "host_frame.h"
 #include "can_common.h"
 #include "gpio_.h"
 #include "timer.h"
 
 volatile bool is_usb_suspend_cb;
 
-static can_data_t *USBD_GS_CAN_GetChannel(USBD_COMPOSITE_HandleTypeDef *hcan,
-										  const uint16_t ch)
-{
-	if (ch < ARRAY_SIZE(hcan->channels)) {
-		return &hcan->channels[ch];
-	}
-
-	return NULL;
+static can_data_t* USBD_GS_CAN_GetChannel(USBD_COMPOSITE_HandleTypeDef *hcan, const uint16_t ch) {
+	return ch < ARRAY_SIZE(hcan->channels) ? &hcan->channels[ch] : NULL;
 }
 
 static const led_seq_step_t led_identify_seq[] = {
@@ -41,9 +34,9 @@ static bool USBD_GS_Prefill_RX_Buffers(USBD_COMPOSITE_HandleTypeDef *hcan)
 		if (hcan->from_host_buf[i])
 			continue;
 
-		hcan->from_host_buf[i] = list_first_entry_or_null(&hcan->list_frame_pool,
-														  struct gs_host_frame_object,
-														  list);
+		// 从共享池获取空闲的帧对象，用于接收主机发送的数据帧
+		hcan->from_host_buf[i] =
+			list_first_entry_or_null(&hcan->list_frame_pool, struct gs_host_frame_object, list);
 		if (!hcan->from_host_buf[i])
 			return false;
 
@@ -136,8 +129,7 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 	 * CAN channel.
 	 *
 	 */
-	if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT ||
-		  req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
+	if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
 		channel = USBD_GS_CAN_GetChannel(hcan, req->wValue);
 		if (!channel) {
 			goto out_fail;
@@ -261,8 +253,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 	 * channel. The validity of req->wValue has been checked in
 	 * USBD_GS_CAN_Config_Request() already.
 	 */
-	if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT ||
-		  req->bRequest == GS_USB_BREQ_DEVICE_CONFIG))
+	if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG))
 		channel = USBD_GS_CAN_GetChannel(hcan, req->wValue);
 
 	if (!IS_ENABLED(CONFIG_CANFD)) {
@@ -293,12 +284,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			 */
 			break;
 		case GS_USB_BREQ_BITTIMING: {
-			const struct gs_device_bittiming *timing = &ep0->bittiming;
-
-			if (!can_check_bittiming_ok(&CAN_btconst.btc, timing))
-				goto out_fail;
-
-			can_set_bittiming(channel, timing);
+			if (!can_set_bittiming(channel, &ep0->bittiming)) goto out_fail;
 			break;
 		}
 		case GS_USB_BREQ_MODE: {
@@ -307,34 +293,24 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			if (mode->mode == GS_CAN_MODE_RESET) {
 				can_disable(hcan, channel);
 			} else if (mode->mode == GS_CAN_MODE_START) {
-				can_enable(channel, mode->feature);
+				if (!can_enable(channel, mode->feature)) goto out_fail;
 			}
 			break;
 		}
 		case GS_USB_BREQ_IDENTIFY: {
-			const struct gs_identify_mode *imode = &ep0->identify_mode;
-
-			if (imode->mode) {
+			if (ep0->identify_mode.mode) {
 				led_run_sequence(&channel->leds, led_identify_seq, -1);
 			} else {
-				led_set_mode(&channel->leds, can_is_enabled(channel) ?
-							 LED_MODE_NORMAL : LED_MODE_OFF);
+				led_set_mode(&channel->leds, can_is_enabled(channel) ? LED_MODE_NORMAL : LED_MODE_OFF);
 			}
 			break;
 		}
 		case GS_USB_BREQ_DATA_BITTIMING: {
-			const struct gs_device_bittiming *timing = &ep0->bittiming;
-
-			if (!can_check_bittiming_ok(&CAN_btconst_ext.dbtc, timing))
-				goto out_fail;
-
-			can_set_data_bittiming(channel, timing);
+			if (!can_set_data_bittiming(channel, &ep0->bittiming)) goto out_fail;
 			break;
 		}
 		case GS_USB_BREQ_SET_TERMINATION: {
-			const struct gs_device_termination_state *term_state = &ep0->term_state;
-
-			set_term(channel, term_state->state);
+			set_term(channel, ep0->term_state.state);
 			break;
 		}
 		default:
@@ -485,7 +461,7 @@ static uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev,
 									 struct gs_host_frame_object *frame_object)
 {
 	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-	const can_data_t *channel = gs_host_frame_object_get_channel(hcan, frame_object);
+	const can_data_t *channel = &hcan->channels[frame_object->frame.channel];
 	const struct gs_host_frame *frame = &frame_object->frame;
 	uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];
 	uint8_t *send_addr;
@@ -621,11 +597,10 @@ void usbd_gs_can_purge_to_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hca
 	 * For more than one channel, iterate over each object in hcan->list_to_host.
 	 */
 	struct gs_host_frame_object *iter, *next;
-	const uint8_t channel_nr = can_channel_get_nr(channel);
 	const bool was_irq_enabled = disable_irq();
 
 	list_for_each_entry_safe(iter, next, &hcan->list_to_host, list) {
-		if (gs_host_frame_object_get_channel_nr(iter) == channel_nr) {
+		if (iter->frame.channel == channel->nr) {
 			list_move_tail(&iter->list, &hcan->list_frame_pool);
 		}
 	}

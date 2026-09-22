@@ -34,7 +34,7 @@ static int term_state = 0;
 
 enum gs_can_termination_state get_term(can_data_t *channel)
 {
-	const uint8_t nr = can_channel_get_nr(channel);
+	const uint8_t nr = channel->nr;
 
 	if (term_state & (1 << nr)) {
 		return GS_CAN_TERMINATION_STATE_ON;
@@ -45,7 +45,7 @@ enum gs_can_termination_state get_term(can_data_t *channel)
 
 void set_term(can_data_t *channel, enum gs_can_termination_state state)
 {
-	const uint8_t nr = can_channel_get_nr(channel);
+	const uint8_t nr = channel->nr;
 
 	if (state == GS_CAN_TERMINATION_STATE_ON) {
 		term_state |= 1 << nr;

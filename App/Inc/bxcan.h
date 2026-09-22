@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2026 Marc Kleine-Budde <kernel@pengutronix.de>
+ * Copyright (c) 2016 Hubert Denkmair
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,14 +25,63 @@
 
 #pragma once
 
-#include <stdbool.h>
 #include <stdint.h>
+#include <stdbool.h>
 
-struct can_channel;
-struct can_drv_reg_status;
-struct gs_device_state;
-struct gs_device_tdc;
-struct gs_host_frame;
+#include "config.h"
+#include "gs_usb.h"
+#include "stm32f0xx_hal.h"
+#include "led.h"
+#include "list.h"
+
+struct can_drv_reg_status {
+#if defined (CONFIG_BXCAN)
+	uint32_t esr;
+#elif defined(CONFIG_M_CAN)
+	uint32_t ecr;
+	uint32_t psr;
+#endif
+};
+
+enum can_channel_flag {
+	CAN_CHANNEL_FLAG_BITTIMING_SET = BIT(0),
+	CAN_CHANNEL_FLAG_DATA_BITTIMING_SET = BIT(1),
+};
+
+#define CAN_CHANNEL_BUS_OFF_RESTART_DISABLED 0
+
+typedef struct can_channel {
+#if defined (CONFIG_BXCAN)
+	CAN_HandleTypeDef *hcan;
+#elif defined(CONFIG_M_CAN)
+	FDCAN_HandleTypeDef *hfdcan;
+#endif
+	struct can_drv_reg_status reg_status;
+	struct list_head list_from_host;		// 待发送到CAN总线的帧队列
+	led_data_t leds;
+	uint32_t feature;
+	enum can_channel_flag flags;
+	enum gs_can_state state;
+	uint32_t bus_off_restart;
+	struct gs_device_bittiming bittiming;
+#ifdef CONFIG_CANFD
+	struct gs_device_bittiming data_bittiming;
+	struct gs_device_tdc tdc;
+#endif
+	uint8_t nr;
+} can_data_t;
+
+extern const struct gs_device_bt_const CAN_btconst;
+extern const struct gs_device_bt_const_extended CAN_btconst_ext;
+extern const struct gs_device_filter_info CAN_filter_info;
+extern const struct gs_device_tdc_const CAN_tdc_const;
+
+void can_init(can_data_t *channel);
+
+bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame);
+bool can_is_rx_pending(can_data_t *channel);
+
+bool can_send(can_data_t *channel, struct gs_host_frame *frame);
 
 void can_drv_enable(struct can_channel *channel);
 void can_drv_disable(struct can_channel *channel);
@@ -45,7 +94,6 @@ bool can_drv_bus_error_pending(const struct can_channel *channel);
 bool can_drv_handle_bus_error(const struct can_channel *channel, struct gs_host_frame *frame);
 
 enum gs_can_state can_drv_get_state(const struct can_channel *channel);
-void can_drv_get_device_state(const struct can_channel *channel, struct gs_device_state *state);
 void can_drv_handle_state_change(const struct can_channel *channel, struct gs_host_frame *frame);
 
 void can_drv_handle_bus_off_recovery(struct can_channel *channel);

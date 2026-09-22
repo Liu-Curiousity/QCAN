@@ -30,7 +30,7 @@
 
 #include "usbd_def.h"
 #include "usbd_dfu.h"
-#include "can.h"
+#include "bxcan.h"
 #include "compiler.h"
 #include "config.h"
 #include "gs_usb.h"
@@ -93,17 +93,17 @@ typedef struct {
 
 	USBD_SetupReqTypedef last_setup_request;
 
-	struct list_head list_frame_pool;
-	struct list_head list_to_host;
+	struct list_head list_frame_pool; // 共享空闲队列
+	struct list_head list_to_host;    // 向主机发送帧的队列
 
-	struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT];
-	struct gs_host_frame_object *to_host_buf;
+	struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
+	struct gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
 
 	can_data_t channels[NUM_CAN_CHANNEL];
 
 	uint32_t sof_timestamp_us;
 
-	struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE];
+	struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE];	// 共享池实际储存位置
 
 	bool dfu_detach_requested;
 } USBD_COMPOSITE_HandleTypeDef __attribute__ ((aligned (4)));

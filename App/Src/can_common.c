@@ -25,8 +25,6 @@
  */
 
 #include "can_common.h"
-#include "can_drv.h"
-#include "host_frame.h"
 #include "led.h"
 #include "timer.h"
 #include "usbd_composite.h"
@@ -41,6 +39,18 @@
 const struct gs_device_bt_const_extended CAN_btconst_ext;
 const struct gs_device_tdc_const CAN_tdc_const;
 #endif
+
+static inline struct gs_host_frame_object* gs_host_frame_object_get_locked(USBD_COMPOSITE_HandleTypeDef *hcan) {
+	bool was_irq_enabled = disable_irq();
+	struct gs_host_frame_object *frame_object = list_first_entry_or_null(&hcan->list_frame_pool,
+																		 struct gs_host_frame_object,
+																		 list);
+
+	if (frame_object) list_del(&frame_object->list);
+
+	restore_irq(was_irq_enabled);
+	return frame_object;
+}
 
 bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
 							const struct gs_device_bittiming *timing)
@@ -59,11 +69,21 @@ bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
 	return true;
 }
 
-void can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *bt)
-{
+bool can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing) {
+	if (!can_check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
 	channel->flags |= CAN_CHANNEL_FLAG_BITTIMING_SET;
+	channel->bittiming = *timing;
+	return true;
+}
 
-	channel->bittiming = *bt;
+bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing) {
+	if (!can_check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
+	channel->flags |= CAN_CHANNEL_FLAG_DATA_BITTIMING_SET;
+#ifdef CONFIG_CANFD
+	channel->data_bittiming = *timing;
+	return true;
+#endif
+	return false;
 }
 
 #ifdef CONFIG_CANFD
@@ -179,8 +199,7 @@ bool can_is_enabled(const struct can_channel *channel)
 	return channel->state < GS_CAN_STATE_STOPPED;
 }
 
-void can_enable(struct can_channel *channel, const uint32_t feature)
-{
+bool can_enable(struct can_channel *channel, const uint32_t feature) {
 	led_set_mode(&channel->leds, LED_MODE_NORMAL);
 
 	channel->feature = feature;
@@ -188,6 +207,7 @@ void can_enable(struct can_channel *channel, const uint32_t feature)
 	can_calc_tdco(channel);
 
 	can_drv_enable(channel);
+	return true;
 }
 
 void can_disable(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel) {
@@ -263,14 +283,18 @@ void CAN_ReceiveFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel) {
 }
 
 void can_get_device_state(const struct can_channel *channel, struct gs_device_state *state) {
-	can_drv_get_device_state(channel, state);
+	const uint32_t reg_esr = channel->reg_status.esr;
+
+	state->state = can_drv_get_state(channel);
+	state->rxerr = FIELD_GET(CAN_ESR_REC, reg_esr);
+	state->txerr = FIELD_GET(CAN_ESR_TEC, reg_esr);
 }
 
 static void can_prepare_error_frame(const struct can_channel *channel, struct gs_host_frame *frame) {
 	frame->echo_id = GS_HOST_FRAME_ECHO_ID_RX;
 	frame->can_id = CAN_ERR_FLAG;
 	frame->can_dlc = CAN_ERR_DLC;
-	frame->channel = can_channel_get_nr(channel);
+	frame->channel = channel->nr;
 	frame->flags = 0;
 	frame->reserved = 0;
 	*frame->classic_can = (struct classic_can){0};
