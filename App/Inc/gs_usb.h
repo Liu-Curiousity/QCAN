@@ -61,33 +61,6 @@
 #define GS_CAN_FEATURE_TERMINATION						  (1<<11)
 #define GS_CAN_FEATURE_BERR_REPORTING					  (1<<12)
 #define GS_CAN_FEATURE_GET_STATE						  (1<<13)
-#define GS_CAN_FEATURE_ELM_PROTOCOL						  (1<<14)
-/* supported by Elmue firmware until 0x260528 (including) */
-#define GS_CAN_FEATURE_ELM_DISABLE_TX_ECHO				  (1<<15)
-/* supported by Elmue firmware since 0x260529 */
-#define GS_CAN_FEATURE_ELM_DEV_FLAG_SEND_USB_BLOBS		  (1<<15)
-/* supported by Elmue firmware 0x260528 only */
-#define GS_CAN_FEATURE_ELM_DEV_FLAG_SEND_USB_BLOBS_260528 (1<<16)
-/* device supports HW filter, see:
- * - GS_USB_BREQ_SET_FILTER,
- * - GS_USB_BREQ_GET_FILTER,
- * - struct gs_device_filter_info
- * - struct gs_device_filter
- */
-#define GS_CAN_FEATURE_FILTER							  (1<<16)
-/* device supports TDC configuration, see:
- * - GS_USB_BREQ_GET_TDC_CONST
- * - GS_USB_BREQ_SET_TDC
- * - GS_USB_BREQ_GET_TDC
- * - struct gs_device_tdc_const
- * - struct gs_device_tdc
- */
-#define GS_CAN_FEATURE_TDC								  (1<<17)
-/* device support CAN bus off recovery
- * - GS_USB_BREQ_BUS_OFF_RECOVERY
- * - struct gs_device_bus_off_recovery
- */
-#define GS_CAN_FEATURE_BUS_OFF_RECOVERY					  (1<<18)
 
 #define GS_CAN_FLAG_OVERFLOW							  (1<<0)
 #define GS_CAN_FLAG_FD									  (1<<1) /* is a CAN-FD frame */
@@ -191,25 +164,7 @@ enum gs_usb_breq {
 	GS_USB_BREQ_BT_CONST_EXT,
 	GS_USB_BREQ_SET_TERMINATION,
 	GS_USB_BREQ_GET_TERMINATION,
-	GS_USB_BREQ_GET_STATE,
-	GS_USB_BREQ_SET_FILTER,
-	GS_USB_BREQ_GET_FILTER,
-	GS_USB_BREQ_GET_TDC_CONST,
-	GS_USB_BREQ_SET_TDC,
-	GS_USB_BREQ_GET_TDC,
-	GS_USB_BREQ_ELM_GET_BOARDINFO = 20,
-	GS_USB_BREQ_ELM_SET_FILTER,
-	GS_USB_BREQ_ELM_GET_LASTERROR,
-	GS_USB_BREQ_ELM_SET_BUSLOADREPORT,
-	GS_USB_BREQ_ELM_SET_PINSTATUS,
-	GS_USB_BREQ_ELM_GET_PINSTATUS,
-	GS_USB_BREQ_ELM_READ_FLASH,
-	GS_USB_BREQ_ELM_WRITE_FLASH,
-	__GS_USB_BREQ_ELM_PLACEHOLDER_28,
-	__GS_USB_BREQ_ELM_PLACEHOLDER_29,
-	__GS_USB_BREQ_ELM_PLACEHOLDER_30,
-	__GS_USB_BREQ_ELM_PLACEHOLDER_31,
-	GS_USB_BREQ_BUS_OFF_RECOVERY = 32,
+	GS_USB_BREQ_GET_STATE
 };
 
 enum gs_can_mode {
@@ -316,22 +271,6 @@ struct gs_device_filter_info {
 	u8 dev;         // enum gs_device_filter_dev
 	u8 reserved[3];
 }  __packed __aligned(4);
-
-struct gs_device_filter_bxcan {
-	u32 fs1r;
-	u32 fm1r;
-	u32 ffa1r;
-	u32 fa1r;
-	u32 fr1[14];
-	u32 fr2[14];
-} __packed __aligned(4);
-
-struct gs_device_filter {
-	struct gs_device_filter_info info;
-	union {
-		struct gs_device_filter_bxcan bxcan;
-	};
-} __packed __aligned(4);
 
 enum gs_device_tdc_mode {
 	GS_CAN_TDC_MODE_OFF = BIT(0),

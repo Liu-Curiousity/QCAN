@@ -83,7 +83,6 @@ typedef struct {
 			const struct gs_device_bittiming bittiming;
 			const struct gs_device_mode mode;
 			const struct gs_identify_mode identify_mode;
-			const struct gs_device_filter filter;
 
 			// Device <-> Host
 			struct gs_device_termination_state term_state;

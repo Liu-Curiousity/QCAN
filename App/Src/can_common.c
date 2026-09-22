@@ -42,10 +42,6 @@ const struct gs_device_bt_const_extended CAN_btconst_ext;
 const struct gs_device_tdc_const CAN_tdc_const;
 #endif
 
-#ifndef CONFIG_CAN_FILTER
-const struct gs_device_filter_info CAN_filter_info;
-#endif
-
 bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
 							const struct gs_device_bittiming *timing)
 {
@@ -68,21 +64,6 @@ void can_set_bittiming(struct can_channel *channel, const struct gs_device_bitti
 	channel->flags |= CAN_CHANNEL_FLAG_BITTIMING_SET;
 
 	channel->bittiming = *bt;
-}
-
-bool can_check_feature_ok(const can_data_t *channel,
-						  const uint32_t feature)
-{
-	if (!IS_ENABLED(CONFIG_CANFD))
-		return true;
-
-	/* TDC requires TDC parameters to be set */
-	if (feature & GS_CAN_FEATURE_TDC &&
-		!(channel->flags & CAN_CHANNEL_FLAG_TDC_SET)) {
-		return false;
-	}
-
-	return true;
 }
 
 #ifdef CONFIG_CANFD
@@ -190,13 +171,6 @@ static inline void can_clear_tdc(can_data_t __maybe_unused *channel)
 
 static inline void can_calc_tdco(can_data_t __maybe_unused *channel)
 {
-}
-#endif
-
-#ifdef CONFIG_CAN_FILTER
-bool can_check_filter_ok(const struct gs_device_filter *filter)
-{
-	return filter->info.dev == CAN_filter_info.dev;
 }
 #endif
 
@@ -388,11 +362,6 @@ static bool can_bus_error_pending(const struct can_channel *channel) {
 	return can_drv_bus_error_pending(channel);
 }
 
-bool can_check_bus_off_recovery_ok(const struct can_channel *channel) {
-	return channel->feature & GS_CAN_FEATURE_BUS_OFF_RECOVERY &&
-	       channel->state == GS_CAN_STATE_BUS_OFF;
-}
-
 void can_schedule_bus_off_recovery(struct can_channel *channel, const uint32_t delay_ms) {
 	channel->bus_off_restart = HAL_GetTick() + delay_ms;
 
@@ -411,8 +380,7 @@ static void can_handle_state_change(USBD_COMPOSITE_HandleTypeDef *hcan, struct c
 		frame->can_id |= CAN_ERR_BUSOFF;
 
 		/* host is not taking care of CAN bus of recovery */
-		if (!(channel->feature & GS_CAN_FEATURE_BUS_OFF_RECOVERY))
-			can_schedule_bus_off_recovery(channel, CAN_BUS_OFF_RESTART_DELAY_MS);
+		can_schedule_bus_off_recovery(channel, CAN_BUS_OFF_RESTART_DELAY_MS);
 	} else {
 		frame->can_id |= CAN_ERR_CRTL | CAN_ERR_CNT;
 		can_drv_handle_state_change(channel, frame);

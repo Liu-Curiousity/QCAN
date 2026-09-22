@@ -40,7 +40,6 @@
 #define CAN_LEC_CRC_ERROR	6
 #define CAN_LEC_SOFTWARE	7
 
-bool can_check_feature_ok(const can_data_t *channel, const uint32_t feature);
 bool can_check_bittiming_ok(const struct can_bittiming_const *btc, const struct gs_device_bittiming *timing);
 void can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *bt);
 
@@ -69,15 +68,6 @@ static inline void can_set_tdc(struct can_channel __maybe_unused *channel,
 static inline void can_get_device_tdc(const struct can_channel __maybe_unused *channel,
 									  struct gs_device_tdc __maybe_unused *tdc)
 {
-}
-#endif
-
-#ifdef CONFIG_CAN_FILTER
-bool can_check_filter_ok(const struct gs_device_filter *filter);
-#else
-static inline bool can_check_filter_ok(const struct gs_device_filter __maybe_unused *filter)
-{
-	return false;
 }
 #endif
 
@@ -120,7 +110,6 @@ uint8_t gs_can_tx_state_to_frame(const enum gs_can_state state);
 uint8_t gs_can_rx_state_to_frame(const enum gs_can_state state);
 void can_lec_error_to_frame(struct gs_host_frame *frame, const uint8_t lec);
 
-bool can_check_bus_off_recovery_ok(const struct can_channel *channel);
 void can_schedule_bus_off_recovery(struct can_channel *channel, uint32_t delay_ms);
 
 void CAN_SendFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);

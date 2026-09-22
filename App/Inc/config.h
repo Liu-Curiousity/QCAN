@@ -62,7 +62,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOB
 	#define LEDRX_Pin				 GPIO_PIN_0 /* green */
@@ -84,7 +83,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOB
 	#define LEDRX_Pin				 GPIO_PIN_0 /* green */
@@ -106,7 +104,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOA
 	#define LEDRX_Pin				 GPIO_PIN_9 /* RX: green */
@@ -140,7 +137,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOB
 	#define LEDRX_Pin				 GPIO_PIN_0 /* green */
@@ -163,7 +159,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define CONFIG_PHY				 1
 	#define CONFIG_PHY_SILENT		 1
@@ -190,7 +185,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDTX_GPIO_Port			 GPIOA
 	#define LEDTX_Pin				 GPIO_PIN_1 /* blue */
@@ -214,7 +208,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOA
 	#define LEDRX_Pin				 GPIO_PIN_1
@@ -236,7 +229,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOA
 	#define LEDRX_Pin				 GPIO_PIN_0
@@ -258,7 +250,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOB
 	#define LEDRX_Pin				 GPIO_PIN_1
@@ -280,7 +271,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOA
 	#define LEDRX_Pin				 GPIO_PIN_1
@@ -303,7 +293,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOB
 	#define LEDRX_Pin				 GPIO_PIN_0
@@ -326,7 +315,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define LEDRX_GPIO_Port			 GPIOB
 	#define LEDRX_Pin				 GPIO_PIN_0
@@ -348,7 +336,6 @@ THE SOFTWARE.
 	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-	#define CONFIG_CAN_FILTER		 1
 
 	#define CONFIG_PHY				 1
 	#define CONFIG_PHY_SILENT		 1

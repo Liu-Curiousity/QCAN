@@ -46,7 +46,6 @@ struct can_drv_reg_status {
 enum can_channel_flag {
 	CAN_CHANNEL_FLAG_BITTIMING_SET = BIT(0),
 	CAN_CHANNEL_FLAG_DATA_BITTIMING_SET = BIT(1),
-	CAN_CHANNEL_FLAG_TDC_SET = BIT(2),
 };
 
 #define CAN_CHANNEL_BUS_OFF_RESTART_DISABLED 0
@@ -69,9 +68,6 @@ typedef struct can_channel {
 	struct gs_device_bittiming data_bittiming;
 	struct gs_device_tdc tdc;
 #endif
-#if defined (CONFIG_BXCAN)
-	struct gs_device_filter filter;
-#endif
 #if (NUM_CAN_CHANNEL > 1)
 	uint8_t nr;
 #endif
@@ -83,14 +79,6 @@ extern const struct gs_device_filter_info CAN_filter_info;
 extern const struct gs_device_tdc_const CAN_tdc_const;
 
 void can_init(can_data_t *channel);
-
-#ifdef CONFIG_CAN_FILTER
-void can_set_filter(can_data_t *channel, const struct gs_device_filter *filter);
-#else
-static inline void can_set_filter(can_data_t __maybe_unused *channel, const struct gs_device_filter  __maybe_unused *filter)
-{
-}
-#endif
 
 bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame);
 bool can_is_rx_pending(can_data_t *channel);

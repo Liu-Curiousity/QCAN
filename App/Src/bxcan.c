@@ -43,9 +43,6 @@ const struct gs_device_bt_const CAN_btconst = {
 		 GS_CAN_FEATURE_TERMINATION : 0) |
 		GS_CAN_FEATURE_BERR_REPORTING |
 		GS_CAN_FEATURE_GET_STATE |
-		(IS_ENABLED(CONFIG_CAN_FILTER) ?
-		 GS_CAN_FEATURE_FILTER : 0) |
-		GS_CAN_FEATURE_BUS_OFF_RECOVERY |
 		0,
 	.fclk_can = CAN_CLOCK_SPEED,
 	.btc = {
@@ -93,50 +90,6 @@ extern CAN_HandleTypeDef hcan;
 void can_init(can_data_t *channel)
 {
 	channel->hcan = &hcan;
-	struct gs_device_filter_bxcan *filter = &channel->filter.bxcan;
-
-	filter->fs1r = 0x1;     // 32-bit for filter bank 0
-	filter->fm1r = 0x0;     // Mask mode for filter 0
-	filter->ffa1r = 0x0;    // Assign to FIFO 0
-	filter->fa1r = 0x1;     // Enable filter bank 0
-}
-
-#ifdef CONFIG_CAN_FILTER
-void can_set_filter(can_data_t *channel, const struct gs_device_filter *filter)
-{
-	channel->filter.bxcan = filter->bxcan;
-}
-#endif
-
-static bool can_apply_filter(const can_data_t *channel)
-{
-	const struct gs_device_filter_bxcan *filter = &channel->filter.bxcan;
-	CAN_TypeDef *can = channel->hcan->Instance;
-
-	// disable filter configuration
-	can->FMR |= CAN_FMR_FINIT;
-
-	// use all filter banks for CAN1
-	can->FMR &= ~CAN_FMR_CAN2SB;
-
-	// disable filters
-	can->FA1R = 0x0;
-
-	can->FS1R = filter->fs1r;
-	can->FM1R = filter->fm1r;
-	can->FFA1R = filter->ffa1r;
-
-	for (uint32_t bank = 0; bank < ARRAY_SIZE(filter->fr1); bank++) {
-		can->sFilterRegister[bank].FR1 = filter->fr1[bank];
-		can->sFilterRegister[bank].FR2 = filter->fr2[bank];
-	}
-
-	can->FA1R = filter->fa1r;
-
-	// exit filter configuration mode
-	can->FMR &= ~CAN_FMR_FINIT;
-
-	return true;
 }
 
 void can_drv_enable(struct can_channel *channel)
@@ -177,10 +130,22 @@ void can_drv_enable(struct can_channel *channel)
 	can->MCR = mcr;
 	can->BTR = btr;
 
-	can_apply_filter(channel);
+	CAN_FilterTypeDef filter_config = {
+		.FilterBank = 0,
+		.FilterMode = CAN_FILTERMODE_IDMASK,
+		.FilterScale = CAN_FILTERSCALE_32BIT,
+		.FilterIdHigh = 0x0000,
+		.FilterIdLow = 0x0000,
+		.FilterMaskIdHigh = 0x0000,
+		.FilterMaskIdLow = 0x0000,
+		.FilterFIFOAssignment = CAN_RX_FIFO0,
+		.FilterActivation = ENABLE,
+	};
+	if (HAL_CAN_ConfigFilter(channel->hcan, &filter_config) != HAL_OK) {
+		Error_Handler();
+	}
 
-	can->MCR &= ~CAN_MCR_INRQ;
-	while ((can->MSR & CAN_MSR_INAK) != 0);
+	HAL_CAN_Start(channel->hcan);
 }
 
 void can_drv_disable(struct can_channel *channel)
