@@ -3,7 +3,7 @@
 #include <usbd_ioreq.h>
 #include "usbd_composite.h"
 
-uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
+static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
     USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
     union ep0 *ep0 = &hcan->ep0;
@@ -31,3 +31,7 @@ uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 
     return USBD_OK;
 }
+
+USBD_ClassTypeDef USBD_DFU = {
+    .Setup = USBD_DFU_Setup,
+};

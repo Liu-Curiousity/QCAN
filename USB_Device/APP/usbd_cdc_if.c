@@ -15,7 +15,21 @@ static bool tx_busy, tx_zlp;
 static uint8_t alternate_setting;
 static uint16_t interface_status;
 
-uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev)
+static uint8_t USBD_CDC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
+{
+    device = NULL;
+    USBD_LL_CloseEP(pdev, CDC_IN_EP);
+    USBD_LL_CloseEP(pdev, CDC_OUT_EP);
+    USBD_LL_CloseEP(pdev, CDC_CMD_EP);
+    pdev->ep_in[CDC_IN_EP & 0x7f].is_used = 0;
+    pdev->ep_out[CDC_OUT_EP].is_used = 0;
+    pdev->ep_in[CDC_CMD_EP & 0x7f].is_used = 0;
+    rx_length = rx_offset = control_lines = 0;
+    tx_busy = tx_zlp = false;
+    return USBD_OK;
+}
+
+uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
     static const uint8_t defaults[7] = {0x00, 0xc2, 0x01, 0x00, 0, 0, 8};
     memcpy(line_coding, defaults, sizeof(line_coding)); /* 115200 8N1 */
@@ -34,25 +48,12 @@ uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev)
         goto fail;
     device = pdev;
     return USBD_OK;
-fail:
-    USBD_CDC_DeInit(pdev);
+    fail:
+        USBD_CDC_DeInit(pdev, cfgidx);
     return USBD_FAIL;
 }
 
-void USBD_CDC_DeInit(USBD_HandleTypeDef *pdev)
-{
-    device = NULL;
-    USBD_LL_CloseEP(pdev, CDC_IN_EP);
-    USBD_LL_CloseEP(pdev, CDC_OUT_EP);
-    USBD_LL_CloseEP(pdev, CDC_CMD_EP);
-    pdev->ep_in[CDC_IN_EP & 0x7f].is_used = 0;
-    pdev->ep_out[CDC_OUT_EP].is_used = 0;
-    pdev->ep_in[CDC_CMD_EP & 0x7f].is_used = 0;
-    rx_length = rx_offset = control_lines = 0;
-    tx_busy = tx_zlp = false;
-}
-
-uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
+static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
     if (pdev->dev_state != USBD_STATE_CONFIGURED)
         goto fail;
@@ -91,7 +92,7 @@ fail:
     return USBD_FAIL;
 }
 
-uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
+static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
 {
     if (pdev->request.bmRequest != 0x21 || pdev->request.bRequest != 0x20 ||
         pdev->request.wIndex != CDC_CONTROL_INTERFACE || pdev->request.wLength != 7)
@@ -100,7 +101,20 @@ uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
     return USBD_OK;
 }
 
-uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
+static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
+{
+    if (tx_zlp) {
+        tx_zlp = false;
+        uint8_t result = USBD_LL_Transmit(pdev, CDC_IN_EP, tx_buffer, 0);
+        if (result != USBD_OK)
+            tx_busy = false;
+        return result;
+    }
+    tx_busy = false;
+    return USBD_OK;
+}
+
+static uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
     rx_offset = 0;
     rx_length = (uint16_t)USBD_LL_GetRxDataSize(pdev, CDC_OUT_EP);
@@ -109,6 +123,15 @@ uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
     /* Leave OUT NAKed until the application consumes this packet. */
     return USBD_OK;
 }
+
+USBD_ClassTypeDef USBD_CDC = {
+    .Init = USBD_CDC_Init,
+    .DeInit = USBD_CDC_DeInit,
+    .Setup = USBD_CDC_Setup,
+    .EP0_RxReady = USBD_CDC_EP0_RxReady,
+    .DataIn = USBD_CDC_DataIn,
+    .DataOut = USBD_CDC_DataOut,
+};
 
 uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity)
 {
@@ -154,18 +177,6 @@ uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length)
     return result;
 }
 
-uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
-{
-    if (tx_zlp) {
-        tx_zlp = false;
-        uint8_t result = USBD_LL_Transmit(pdev, CDC_IN_EP, tx_buffer, 0);
-        if (result != USBD_OK)
-            tx_busy = false;
-        return result;
-    }
-    tx_busy = false;
-    return USBD_OK;
-}
 
 uint16_t CDC_GetControlLineState_FS(void)
 {

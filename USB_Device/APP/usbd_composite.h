@@ -29,10 +29,10 @@
 #include <stdint.h>
 
 #include "usbd_def.h"
+#include "usbd_dfu.h"
 #include "can.h"
 #include "compiler.h"
 #include "config.h"
-#include "dfu.h"
 #include "gs_usb.h"
 #include "list.h"
 
@@ -45,9 +45,6 @@
 #endif
 #define USB_CAN_CONFIG_DESC_SIZ	 (50U + CDC_CONFIG_DESC_SIZE)
 #define USBD_GS_CAN_VENDOR_CODE	 0x20
-#define DFU_INTERFACE_NUM		 1
-#define DFU_INTERFACE_STR_INDEX	 0xE0
-#define CDC_INTERFACE_STR_INDEX	 0xE1
 
 extern USBD_ClassTypeDef USBD_COMPOSITE;
 

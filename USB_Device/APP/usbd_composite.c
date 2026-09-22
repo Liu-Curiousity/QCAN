@@ -32,7 +32,6 @@
 #include "compiler.h"
 #include "config.h"
 #include "gs_usb.h"
-#include "timer.h"
 #include "usbd_core.h"
 #include "usbd_ctlreq.h"
 #include "usbd_def.h"
@@ -290,70 +289,69 @@ __ALIGN_BEGIN static uint8_t USBD_MS_EXT_PROP_FEATURE_DESC[] __ALIGN_END= {
 };
 
 static uint8_t USBD_COMPOSITE_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
-	if (USBD_GS_CAN_Init(pdev, cfgidx) != USBD_OK)
-		return USBD_FAIL;
-	if (USBD_CDC_Init(pdev) != USBD_OK)
-		return USBD_FAIL;
-	return USBD_OK;
+	uint8_t ret = USBD_OK;
+	if (USBD_GS_CAN.Init != NULL) ret |= USBD_GS_CAN.Init(pdev, cfgidx);
+	if (USBD_CDC.Init != NULL) ret |= USBD_CDC.Init(pdev, cfgidx);
+	if (USBD_DFU.Init != NULL) ret |= USBD_DFU.Init(pdev, cfgidx);
+	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
-	USBD_GS_CAN_DeInit(pdev, cfgidx);
-	USBD_CDC_DeInit(pdev);
-
-	return USBD_OK;
+	uint8_t ret = USBD_OK;
+	if (USBD_GS_CAN.DeInit != NULL) ret |= USBD_GS_CAN.DeInit(pdev, cfgidx);
+	if (USBD_CDC.DeInit != NULL) ret |= USBD_CDC.DeInit(pdev, cfgidx);
+	if (USBD_DFU.DeInit != NULL) ret |= USBD_DFU.DeInit(pdev, cfgidx);
+	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
 	if ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
-	    (req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE))
-		return USBD_CDC_Setup(pdev, req);
-
-	if (((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE) &&                    // recipient: interface
-	    ((req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS) && // class request
-	    (req->wIndex == DFU_INTERFACE_NUM)) {
-		return USBD_DFU_Setup(pdev, req);
+	    (req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE)) {
+		if (USBD_CDC.Setup != NULL) return USBD_CDC.Setup(pdev, req);
+	} else if ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&     // recipient: interface
+	           (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && // class request
+	           req->wIndex == DFU_INTERFACE_NUM) {
+		if (USBD_DFU.Setup != NULL) return USBD_DFU.Setup(pdev, req);
 	} else {
-		return USBD_GS_CAN_Setup(pdev, req);
+		if (USBD_GS_CAN.Setup != NULL) return USBD_GS_CAN.Setup(pdev, req);
 	}
+	return USBD_OK;
 }
 
 static uint8_t USBD_COMPOSITE_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
 	    (pdev->request.wIndex == CDC_CONTROL_INTERFACE || pdev->request.wIndex == CDC_DATA_INTERFACE))
-		return USBD_CDC_EP0_RxReady(pdev);
-	return USBD_GS_CAN_EP0_RxReady(pdev);
+		if (USBD_CDC.EP0_RxReady != NULL) return USBD_CDC.EP0_RxReady(pdev);
+	if (USBD_GS_CAN.EP0_RxReady != NULL) return USBD_GS_CAN.EP0_RxReady(pdev);
+	return USBD_OK;
 }
 
 static uint8_t USBD_COMPOSITE_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	if (epnum == (CDC_IN_EP & 0x7F))
-		return USBD_CDC_DataIn(pdev, epnum);
+		if (USBD_CDC.DataIn != NULL) return USBD_CDC.DataIn(pdev, epnum);
 	if (epnum == (GSUSB_ENDPOINT_IN & 0x7F))
-		return USBD_GS_CAN_DataIn(pdev, epnum);
+		if (USBD_GS_CAN.DataIn != NULL) return USBD_GS_CAN.DataIn(pdev, epnum);
 	return USBD_OK;
 }
 
 static uint8_t USBD_COMPOSITE_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	if (epnum == CDC_OUT_EP)
-		return USBD_CDC_DataOut(pdev, epnum);
+		if (USBD_CDC.DataOut != NULL) return USBD_CDC.DataOut(pdev, epnum);
 	if (epnum == GSUSB_ENDPOINT_OUT)
-		return USBD_GS_CAN_DataOut(pdev, epnum);
+		if (USBD_GS_CAN.DataOut != NULL) return USBD_GS_CAN.DataOut(pdev, epnum);
 	return USBD_OK;
 }
 
-static uint8_t USBD_COMPOSITE_SOF(struct _USBD_HandleTypeDef *pdev)
-{
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-
-	hcan->sof_timestamp_us = timer_get();
-
+static uint8_t USBD_COMPOSITE_SOF(struct _USBD_HandleTypeDef *pdev) {
+	if (USBD_GS_CAN.SOF != NULL) return USBD_GS_CAN.SOF(pdev);
+	if (USBD_CDC.SOF != NULL) return USBD_CDC.SOF(pdev);
+	if (USBD_DFU.SOF != NULL) return USBD_DFU.SOF(pdev);
 	return USBD_OK;
 }
 
 static uint8_t *USBD_COMPOSITE_GetCfgDesc(uint16_t *length)
 {
 	*length = (uint16_t)sizeof(USBD_COMPOSITE_CfgDesc);
-
 	return USBD_COMPOSITE_CfgDesc;
 }
 

@@ -6,6 +6,7 @@
 #include "host_frame.h"
 #include "can_common.h"
 #include "gpio_.h"
+#include "timer.h"
 
 volatile bool is_usb_suspend_cb;
 
@@ -98,14 +99,14 @@ static const struct gs_device_config USBD_GS_CAN_dconf = {
 	.hw_version = 1,
 };
 
-uint8_t USBD_GS_CAN_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
+static uint8_t USBD_GS_CAN_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 	USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_IN,	 USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
 	USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_OUT, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
 	USBD_GS_CAN_PrepareReceive(pdev);
 	return USBD_OK;
 }
 
-uint8_t USBD_GS_CAN_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
+static uint8_t USBD_GS_CAN_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
 	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
 
@@ -114,9 +115,10 @@ uint8_t USBD_GS_CAN_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 
 	USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
 	USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_OUT);
+	return USBD_OK;
 }
 
-uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
+static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
 	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
 	union ep0 *ep0 = &hcan->ep0;
@@ -286,7 +288,7 @@ out_fail:
 	return USBD_FAIL;
 }
 
-uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
+static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
 	can_data_t *channel = NULL;
 	USBD_SetupReqTypedef *req = &hcan->last_setup_request;
@@ -421,7 +423,7 @@ out_fail:
 	return USBD_FAIL;
 }
 
-uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
+static uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
     USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
 
@@ -434,7 +436,7 @@ uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 }
 
 // Note that the return value is completely ignored by the stack.
-uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
 	can_data_t *channel;
 
@@ -503,6 +505,22 @@ out_prepare_receive:
 
 	return USBD_OK;
 }
+
+static uint8_t USBD_GS_CAN_SOF(struct _USBD_HandleTypeDef *pdev) {
+	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
+	hcan->sof_timestamp_us = timer_get();
+	return USBD_OK;
+}
+
+USBD_ClassTypeDef USBD_GS_CAN = {
+	.Init = USBD_GS_CAN_Init,
+	.DeInit = USBD_GS_CAN_DeInit,
+	.Setup = USBD_GS_CAN_Setup,
+	.EP0_RxReady = USBD_GS_CAN_EP0_RxReady,
+	.DataIn = USBD_GS_CAN_DataIn,
+	.DataOut = USBD_GS_CAN_DataOut,
+	.SOF = USBD_GS_CAN_SOF,
+};
 
 uint8_t USBD_GS_CAN_Init_(USBD_COMPOSITE_HandleTypeDef *hcan, USBD_HandleTypeDef *pdev)
 {
