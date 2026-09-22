@@ -25,11 +25,8 @@
 
 #pragma once
 
-#include <stdint.h>
 #include <stdbool.h>
 #include <stm32f072xb.h>
-
-#define time_after(a, b) ((int)((b) - (a)) < 0)
 
 // ARM's
 // "Application Note 321 ARM Cortex-M Programming Guide to Memory Barrier Instructions"
@@ -73,20 +70,3 @@ static inline void restore_irq(bool was_enabled)
 		enable_irq();
 	}
 }
-
-/* Lightweight assert macro to replace standard assert()
- *
- * Standard assert() needs fprint, __FILE__ , __LINE__ string consts etc.
- *
- * stm32's library has "USE_FULL_ASSERT" to enable some checks, but they have
- * their own assert_param() macro that also passes in __FILE__, __LINE__ so
- * I'm not sure if (and how) it'll be possible to combine both.
- *
- * Interesting notes on
- * https://barrgroup.com/embedded-systems/how-to/define-assert-macro
- *
- */
-#define assert_basic(exp)   \
-		if (exp) {          \
-		} else              \
-		__BKPT(0)

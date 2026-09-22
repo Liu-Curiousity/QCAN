@@ -89,9 +89,10 @@ static void rcc_reset(CAN_TypeDef *instance)
 	}
 #endif
 }
-
+extern CAN_HandleTypeDef hcan;
 void can_init(can_data_t *channel)
 {
+	channel->hcan = &hcan;
 	struct gs_device_filter_bxcan *filter = &channel->filter.bxcan;
 
 	filter->fs1r = 0x1;     // 32-bit for filter bank 0

@@ -24,8 +24,9 @@
 #include "usbd_def.h"
 #include "usbd_core.h"
 
-#include "usbd_gs_can.h"
 #include "usb.h"
+#include "usbd_cdc_if.h"
+#include "usbd_gs_can.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -77,11 +78,11 @@ void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 	bool request_was_handled = false;
 
 	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE) { // device request
-		request_was_handled = USBD_GS_CAN_CustomDeviceRequest(pdev, &pdev->request);
+		request_was_handled = USBD_CustomDeviceRequest(pdev, &pdev->request);
 	}
 
 	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE) { // interface request
-		request_was_handled = USBD_GS_CAN_CustomInterfaceRequest(pdev, &pdev->request);
+		request_was_handled = USBD_CustomInterfaceRequest(pdev, &pdev->request);
 	}
   if (request_was_handled) return;
   /* USER CODE END  HAL_PCD_SetupStageCallback_PreTreatment */
@@ -251,7 +252,7 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   /* Link the driver to the stack. */
   pdev->pData = &hpcd_USB_FS;
 
-	hpcd_USB_FS.Instance = USB_INTERFACE;
+	hpcd_USB_FS.Instance = USB;
 	hpcd_USB_FS.Init.dev_endpoints = 5U;
 	hpcd_USB_FS.Init.speed = PCD_SPEED_FULL;
 	hpcd_USB_FS.Init.ep0_mps = EP_MPS_64;
@@ -276,19 +277,22 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
   }
 
     /*
-	 * PMA layout
-	 *  0x00 -  0x17 (24 bytes) metadata?
-	 *  0x18 -  0x57 (64 bytes) EP0 OUT
-	 *  0x58 -  0x97 (64 bytes) EP0 IN
-	 *  0x98 -  0xD7 (64 bytes) EP1 IN
-	 *  0xD8 - 0x157 (128 bytes) EP1 OUT (buffer 1)
-	 * 0x158 - 0x1D7 (128 bytes) EP1 OUT (buffer 2)
+	 * STM32F072 PMA layout (1 KiB); reserve all 8 BTABLE entries.
+	 * 0x000..0x03f: BTABLE
+	 * 0x040..0x07f: EP0 OUT; 0x080..0x0bf: EP0 IN
+	 * 0x0c0..0x0ff: CAN EP1 IN
+	 * 0x100..0x17f, 0x180..0x1ff: CAN EP2 OUT double buffers
+	 * 0x200..0x23f: CDC EP3 OUT; 0x240..0x27f: CDC EP3 IN
+	 * 0x280..0x287: CDC EP4 interrupt IN
 	 */
 #if defined(USB) || defined(USB_DRD_FS)
-	HAL_PCDEx_PMAConfig(pdev->pData, 0x00,				 PCD_SNG_BUF, 0x18);
-	HAL_PCDEx_PMAConfig(pdev->pData, 0x80,				 PCD_SNG_BUF, 0x58);
-	HAL_PCDEx_PMAConfig(pdev->pData, GSUSB_ENDPOINT_IN,	 PCD_SNG_BUF, 0x98);
-	HAL_PCDEx_PMAConfig(pdev->pData, GSUSB_ENDPOINT_OUT, PCD_DBL_BUF, 0x00D80158);
+	HAL_PCDEx_PMAConfig(pdev->pData, 0x00, PCD_SNG_BUF, 0x040);
+	HAL_PCDEx_PMAConfig(pdev->pData, 0x80, PCD_SNG_BUF, 0x080);
+	HAL_PCDEx_PMAConfig(pdev->pData, GSUSB_ENDPOINT_IN, PCD_SNG_BUF, 0x0c0);
+	HAL_PCDEx_PMAConfig(pdev->pData, GSUSB_ENDPOINT_OUT, PCD_DBL_BUF, 0x01800100);
+	HAL_PCDEx_PMAConfig(pdev->pData, CDC_OUT_EP, PCD_SNG_BUF, 0x200);
+	HAL_PCDEx_PMAConfig(pdev->pData, CDC_IN_EP, PCD_SNG_BUF, 0x240);
+	HAL_PCDEx_PMAConfig(pdev->pData, CDC_CMD_EP, PCD_SNG_BUF, 0x280);
 #elif defined(USB_OTG_FS)
 	HAL_PCDEx_SetRxFiFo(pdev->pData, USB_RX_FIFO_SIZE); // shared RX FIFO
 	HAL_PCDEx_SetTxFiFo(pdev->pData, 0U, 64U / 4U);     // 0x80, 64 bytes (div by 4 for words)
