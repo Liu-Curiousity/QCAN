@@ -189,10 +189,6 @@ enum gs_can_termination_state {
 	GS_CAN_TERMINATION_UNSUPPORTED = 0xffffffff,    // private, not in kernel enum
 };
 
-enum gs_device_filter_dev {
-	GS_DEVICE_FILTER_DEV_BXCAN = 1,         // bxcan, 14 filters
-};
-
 /* data types passed between host and device */
 struct gs_host_config {
 	u32 byte_order;
@@ -265,34 +261,6 @@ struct gs_identify_mode {
 
 struct gs_device_termination_state {
 	u32 state;
-} __packed __aligned(4);
-
-struct gs_device_filter_info {
-	u8 dev;         // enum gs_device_filter_dev
-	u8 reserved[3];
-}  __packed __aligned(4);
-
-enum gs_device_tdc_mode {
-	GS_CAN_TDC_MODE_OFF = BIT(0),
-	GS_CAN_TDC_MODE_AUTO = BIT(1),
-	GS_CAN_TDC_MODE_MANUAL = BIT(2),
-};
-
-struct gs_device_tdc_const {
-	u32 tdcv_min;
-	u32 tdcv_max;
-	u32 tdco_min;
-	u32 tdco_max;
-	u32 tdcf_min;
-	u32 tdcf_max;
-	u32 mode;
-} __packed __aligned(4);
-
-struct gs_device_tdc {
-	u32 tdcv;
-	u32 tdco;
-	u32 tdcf;
-	enum gs_device_tdc_mode mode;
 } __packed __aligned(4);
 
 struct gs_device_bus_off_recovery {

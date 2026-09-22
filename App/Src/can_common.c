@@ -37,7 +37,6 @@
 
 #ifndef CONFIG_CANFD
 const struct gs_device_bt_const_extended CAN_btconst_ext;
-const struct gs_device_tdc_const CAN_tdc_const;
 #endif
 
 static inline struct gs_host_frame_object* gs_host_frame_object_get_locked(USBD_COMPOSITE_HandleTypeDef *hcan) {
@@ -52,7 +51,7 @@ static inline struct gs_host_frame_object* gs_host_frame_object_get_locked(USBD_
 	return frame_object;
 }
 
-bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
+static bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
 							const struct gs_device_bittiming *timing)
 {
 	const uint32_t tseg1 = timing->prop_seg + timing->phase_seg1;
@@ -71,128 +70,18 @@ bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
 
 bool can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing) {
 	if (!can_check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
-	channel->flags |= CAN_CHANNEL_FLAG_BITTIMING_SET;
 	channel->bittiming = *timing;
 	return true;
 }
 
 bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing) {
 	if (!can_check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
-	channel->flags |= CAN_CHANNEL_FLAG_DATA_BITTIMING_SET;
 #ifdef CONFIG_CANFD
 	channel->data_bittiming = *timing;
 	return true;
 #endif
 	return false;
 }
-
-#ifdef CONFIG_CANFD
-void can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *bt)
-{
-	channel->flags |= CAN_CHANNEL_FLAG_DATA_BITTIMING_SET;
-
-	channel->data_bittiming = *bt;
-}
-
-bool can_check_tdc_ok(const struct gs_device_tdc_const *tdc_const,
-					  const struct gs_device_tdc *tdc)
-{
-	if (tdc->tdcv < tdc_const->tdcv_min || tdc->tdcv > tdc_const->tdcv_max ||
-		tdc->tdco < tdc_const->tdco_min || tdc->tdco > tdc_const->tdco_max ||
-		tdc->tdcf < tdc_const->tdcf_min || tdc->tdcf > tdc_const->tdcf_max)
-		return false;
-
-	const uint32_t mode = tdc->mode & (GS_CAN_TDC_MODE_OFF | GS_CAN_TDC_MODE_AUTO | GS_CAN_TDC_MODE_MANUAL);
-
-	/* one of OFF, AUTO or MANUAL must be active */
-	if (!mode || mode & (mode - 1))
-		return false;
-
-	if (tdc->tdcv) {
-		/* TDCV is incompatible with AUTO */
-		if (mode & GS_CAN_TDC_MODE_AUTO) {
-			return false;
-		}
-	} else {
-		/* MANUAL requires TDCV */
-		if (mode & GS_CAN_TDC_MODE_MANUAL) {
-			return false;
-		}
-	}
-
-	/* TDCO is mandatory for AUTO or MANUAL */
-	if ((mode & GS_CAN_TDC_MODE_AUTO || mode & GS_CAN_TDC_MODE_MANUAL) &&
-		!tdc->tdco) {
-		return false;
-	}
-
-	return true;
-}
-
-void can_set_tdc(struct can_channel *channel, const struct gs_device_tdc *tdc)
-{
-	channel->flags |= CAN_CHANNEL_FLAG_TDC_SET;
-
-	channel->tdc = *tdc;
-}
-
-void can_get_device_tdc(const struct can_channel *channel, struct gs_device_tdc *tdc)
-{
-	if (tdc->mode == GS_CAN_TDC_MODE_OFF) {
-		*tdc = (struct gs_device_tdc){
-			.mode = GS_CAN_TDC_MODE_OFF
-		};
-	} else {
-		*tdc = channel->tdc;
-		can_drv_get_device_tdc(channel, tdc);
-	}
-}
-
-static void can_clear_tdc(can_data_t *channel)
-{
-	channel->tdc = (struct gs_device_tdc){ 0 };
-}
-
-static void can_calc_tdco(can_data_t *channel)
-{
-	/* host configured a TDC mode, skip TDCO calculation */
-	if (channel->feature & GS_CAN_FEATURE_TDC) {
-		return;
-	}
-
-	struct gs_device_tdc *tdc = &channel->tdc;
-	tdc->mode = GS_CAN_TDC_MODE_OFF;
-
-	/* TDC is only needed for CAN_FD */
-	if (!(channel->feature & GS_CAN_FEATURE_FD)) {
-		return;
-	}
-
-	/* host has not configured a TDC */
-	const struct gs_device_bittiming *dbt = &channel->data_bittiming;
-	const struct gs_device_tdc_const *tdc_const = &CAN_tdc_const;
-
-	if (!(dbt->brp == 1 || dbt->brp == 2)) {
-		return;
-	}
-
-	const uint32_t sample_point_in_tc = (1 + dbt->prop_seg + dbt->phase_seg1) * dbt->brp;
-	if (sample_point_in_tc < tdc_const->tdco_min) {
-		return;
-	}
-
-	tdc->tdco = min(sample_point_in_tc, tdc_const->tdco_max);
-	tdc->mode = GS_CAN_TDC_MODE_AUTO;
-}
-#else
-static inline void can_clear_tdc(can_data_t __maybe_unused *channel)
-{
-}
-
-static inline void can_calc_tdco(can_data_t __maybe_unused *channel)
-{
-}
-#endif
 
 bool can_is_enabled(const struct can_channel *channel)
 {
@@ -204,7 +93,6 @@ bool can_enable(struct can_channel *channel, const uint32_t feature) {
 
 	channel->feature = feature;
 	channel->state = GS_CAN_STATE_ERROR_ACTIVE;
-	can_calc_tdco(channel);
 
 	can_drv_enable(channel);
 	return true;
@@ -216,22 +104,18 @@ void can_disable(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel
 	usbd_gs_can_purge_from_host_list_by_channel(hcan, channel);
 	usbd_gs_can_purge_to_host_list_by_channel(hcan, channel);
 
-	can_clear_tdc(channel);
 	channel->bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
 	channel->state = GS_CAN_STATE_STOPPED;
-	channel->flags = 0;
 	channel->feature = 0;
 
 	led_set_mode(&channel->leds, LED_MODE_OFF);
 }
 
 void CAN_SendFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel) {
-	struct gs_host_frame_object *frame_object;
-
 	bool was_irq_enabled = disable_irq();
-	frame_object = list_first_entry_or_null(&channel->list_from_host,
-	                                        struct gs_host_frame_object,
-	                                        list);
+	struct gs_host_frame_object *frame_object =
+		list_first_entry_or_null(&channel->list_from_host, struct gs_host_frame_object, list);
+
 	if (!frame_object) {
 		restore_irq(was_irq_enabled);
 		return;

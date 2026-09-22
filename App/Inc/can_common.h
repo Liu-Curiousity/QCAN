@@ -40,7 +40,6 @@
 #define CAN_LEC_CRC_ERROR	6
 #define CAN_LEC_SOFTWARE	7
 
-bool can_check_bittiming_ok(const struct can_bittiming_const *btc, const struct gs_device_bittiming *timing);
 bool can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
 bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
 

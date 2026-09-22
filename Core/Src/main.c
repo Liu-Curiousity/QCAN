@@ -18,7 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "bxcan.h"
+#include "can.h"
 #include "i2c.h"
 #include "tim.h"
 #include "usart.h"
@@ -128,7 +128,7 @@ int main(void)
          LEDRX_GPIO_Port, LEDRX_Pin, LEDRX_Active_High,
          LEDTX_GPIO_Port, LEDTX_Pin, LEDTX_Active_High);
 
-    can_init(channel);
+    channel->hcan = &hcan;
     can_disable(&hGS_CAN, channel);
   }
 

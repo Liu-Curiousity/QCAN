@@ -43,11 +43,6 @@ struct can_drv_reg_status {
 #endif
 };
 
-enum can_channel_flag {
-	CAN_CHANNEL_FLAG_BITTIMING_SET = BIT(0),
-	CAN_CHANNEL_FLAG_DATA_BITTIMING_SET = BIT(1),
-};
-
 #define CAN_CHANNEL_BUS_OFF_RESTART_DISABLED 0
 
 typedef struct can_channel {
@@ -60,23 +55,17 @@ typedef struct can_channel {
 	struct list_head list_from_host;		// 待发送到CAN总线的帧队列
 	led_data_t leds;
 	uint32_t feature;
-	enum can_channel_flag flags;
 	enum gs_can_state state;
 	uint32_t bus_off_restart;
 	struct gs_device_bittiming bittiming;
 #ifdef CONFIG_CANFD
 	struct gs_device_bittiming data_bittiming;
-	struct gs_device_tdc tdc;
 #endif
 	uint8_t nr;
 } can_data_t;
 
 extern const struct gs_device_bt_const CAN_btconst;
 extern const struct gs_device_bt_const_extended CAN_btconst_ext;
-extern const struct gs_device_filter_info CAN_filter_info;
-extern const struct gs_device_tdc_const CAN_tdc_const;
-
-void can_init(can_data_t *channel);
 
 bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame);
 bool can_is_rx_pending(can_data_t *channel);
@@ -85,8 +74,6 @@ bool can_send(can_data_t *channel, struct gs_host_frame *frame);
 
 void can_drv_enable(struct can_channel *channel);
 void can_drv_disable(struct can_channel *channel);
-
-void can_drv_get_device_tdc(const struct can_channel *channel, struct gs_device_tdc *tdc);
 
 void can_drv_read_reg_status(struct can_channel *channel);
 

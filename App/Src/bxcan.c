@@ -24,11 +24,11 @@
  *
  */
 
-#include "can.h"
 #include "bxcan.h"
 #include "can_common.h"
 #include "config.h"
 #include "gs_usb.h"
+#include "main.h"
 #include "timer.h"
 
 const struct gs_device_bt_const CAN_btconst = {
@@ -57,78 +57,31 @@ const struct gs_device_bt_const CAN_btconst = {
 	},
 };
 
-#ifdef CONFIG_CAN_FILTER
-const struct gs_device_filter_info CAN_filter_info = {
-	.dev = GS_DEVICE_FILTER_DEV_BXCAN,
-};
-#endif
-
-// The STM32F0 only has one CAN interface, define it as CAN1 as
-// well, so it doesn't need to be handled separately.
-#if !defined(CAN1) && defined(CAN)
-#define CAN1 CAN
-#endif
-
-// Completely reset the CAN pheriperal, including bus-state and error counters
-static void rcc_reset(CAN_TypeDef *instance)
-{
-#ifdef CAN1
-	if (instance == CAN1) {
-		__HAL_RCC_CAN1_FORCE_RESET();
-		__HAL_RCC_CAN1_RELEASE_RESET();
-	}
-#endif
-
-#ifdef CAN2
-	if (instance == CAN2) {
-		__HAL_RCC_CAN2_FORCE_RESET();
-		__HAL_RCC_CAN2_RELEASE_RESET();
-	}
-#endif
-}
-
-void can_init(can_data_t *channel)
-{
-	channel->hcan = &hcan;
-}
-
 void can_drv_enable(struct can_channel *channel)
 {
-	const uint32_t feature = channel->feature;
-	CAN_TypeDef *can = channel->hcan->Instance;
-
-	uint32_t mcr = CAN_MCR_INRQ | CAN_MCR_TXFP;
-
-	if (feature & GS_CAN_FEATURE_ONE_SHOT) {
-		mcr |= CAN_MCR_NART;
-	}
-
-	uint32_t btr = FIELD_PREP(CAN_BTR_SJW, channel->bittiming.sjw - 1) |
-				   FIELD_PREP(CAN_BTR_TS2, channel->bittiming.phase_seg2 - 1) |
-				   FIELD_PREP(CAN_BTR_TS1, channel->bittiming.prop_seg + channel->bittiming.phase_seg1 - 1) |
-				   FIELD_PREP(CAN_BTR_BRP, channel->bittiming.brp - 1);
-
-	if (feature & GS_CAN_FEATURE_LISTEN_ONLY) {
-		btr |= CAN_MODE_SILENT;
-	}
-
-	if (feature & GS_CAN_FEATURE_LOOP_BACK) {
-		btr |= CAN_MODE_LOOPBACK;
-	}
-
-	// Reset CAN peripheral
-	can->MCR |= CAN_MCR_RESET;
-	while ((can->MCR & CAN_MCR_RESET) != 0);        // reset bit is set to zero after reset
-	while ((can->MSR & CAN_MSR_SLAK) == 0);         // should be in sleep mode after reset
+	HAL_CAN_DeInit(channel->hcan);
 
 	// Completely reset while being of the bus
-	rcc_reset(can);
-
-	can->MCR |= CAN_MCR_INRQ;
-	while ((can->MSR & CAN_MSR_INAK) == 0);
-
-	can->MCR = mcr;
-	can->BTR = btr;
+	__HAL_RCC_CAN1_FORCE_RESET();
+	__HAL_RCC_CAN1_RELEASE_RESET();
+	CAN_HandleTypeDef *hcan = channel->hcan;
+	const uint32_t feature = channel->feature;
+	hcan->Init.Prescaler = channel->bittiming.brp;
+	hcan->Init.Mode = (feature & GS_CAN_FEATURE_LISTEN_ONLY ? CAN_MODE_SILENT : CAN_MODE_NORMAL) |
+	                  (feature & GS_CAN_FEATURE_LOOP_BACK ? CAN_MODE_LOOPBACK : CAN_MODE_NORMAL);
+	hcan->Init.SyncJumpWidth = FIELD_PREP(CAN_BTR_SJW, channel->bittiming.sjw - 1);
+	hcan->Init.TimeSeg1 = FIELD_PREP(CAN_BTR_TS1, channel->bittiming.prop_seg + channel->bittiming.phase_seg1 - 1);
+	hcan->Init.TimeSeg2 = FIELD_PREP(CAN_BTR_TS2, channel->bittiming.phase_seg2 - 1);
+	hcan->Init.TimeTriggeredMode = DISABLE;
+	hcan->Init.AutoBusOff = DISABLE;
+	hcan->Init.AutoWakeUp = DISABLE;
+	hcan->Init.AutoRetransmission = feature & GS_CAN_FEATURE_ONE_SHOT ? DISABLE : ENABLE;
+	hcan->Init.ReceiveFifoLocked = DISABLE;
+	hcan->Init.TransmitFifoPriority = ENABLE;
+	if (HAL_CAN_Init(hcan) != HAL_OK)
+	{
+		Error_Handler();
+	}
 
 	CAN_FilterTypeDef filter_config = {
 		.FilterBank = 0,
@@ -155,7 +108,7 @@ void can_drv_disable(struct can_channel *channel) {
 bool can_is_rx_pending(can_data_t *channel) {
 	CAN_TypeDef *can = channel->hcan->Instance;
 
-	return ((can->RF0R & CAN_RF0R_FMP0) != 0);
+	return (can->RF0R & CAN_RF0R_FMP0) != 0;
 }
 
 bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame) {
