@@ -94,11 +94,11 @@ void can_drv_enable(struct can_channel *channel)
 		.FilterFIFOAssignment = CAN_RX_FIFO0,
 		.FilterActivation = ENABLE,
 	};
-	if (HAL_CAN_ConfigFilter(channel->hcan, &filter_config) != HAL_OK) {
+	if (HAL_CAN_ConfigFilter(hcan, &filter_config) != HAL_OK) {
 		Error_Handler();
 	}
 
-	HAL_CAN_Start(channel->hcan);
+	HAL_CAN_Start(hcan);
 }
 
 void can_drv_disable(struct can_channel *channel) {
