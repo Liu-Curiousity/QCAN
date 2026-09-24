@@ -13,12 +13,6 @@ static can_data_t* USBD_GS_CAN_GetChannel(USBD_COMPOSITE_HandleTypeDef *hcan, co
 	return ch < ARRAY_SIZE(hcan->channels) ? &hcan->channels[ch] : NULL;
 }
 
-static const led_seq_step_t led_identify_seq[] = {
-	{ .state = 0x01, .time_in_10ms = 10 },
-	{ .state = 0x02, .time_in_10ms = 10 },
-	{ .state = 0x00, .time_in_10ms = 0 }
-};
-
 // Prefill the buffers from RX from host.
 // Return true if pre-allocated buffer list buffer list
 // was changed and is now ready, meaning and RX can be
@@ -299,7 +293,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 		}
 		case GS_USB_BREQ_IDENTIFY: {
 			if (ep0->identify_mode.mode) {
-				led_run_sequence(&channel->leds, led_identify_seq, -1);
+				led_set_mode(&channel->leds, LED_MODE_SEQUENCE);
 			} else {
 				led_set_mode(&channel->leds, can_is_enabled(channel) ? LED_MODE_NORMAL : LED_MODE_OFF);
 			}

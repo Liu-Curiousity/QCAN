@@ -23,10 +23,6 @@ void app_main() {
 
         INIT_LIST_HEAD(&channel->list_from_host);
 
-        led_init(&channel->leds,
-                 LED_RX_GPIO_Port, LED_RX_Pin, 1,
-                 LED_TX_GPIO_Port, LED_RX_Pin, 1);
-
         channel->hcan = &hcan;
         can_disable(&hGS_CAN, channel);
     }
