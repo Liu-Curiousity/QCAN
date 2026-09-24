@@ -59,19 +59,8 @@ THE SOFTWARE.
 
 	#define TIM2_CLOCK_SPEED		 48000000
 
-	#define CAN_INTERFACE			 CAN
 	#define CAN_CLOCK_SPEED			 48000000
 	#define NUM_CAN_CHANNEL			 1
-
-	#define LEDRX_GPIO_Port			 GPIOB
-	#define LEDRX_Pin				 GPIO_PIN_0 /* green */
-	#define LEDRX_Mode				 GPIO_MODE_OUTPUT_PP
-	#define LEDRX_Active_High		 1
-
-	#define LEDTX_GPIO_Port			 GPIOB
-	#define LEDTX_Pin				 GPIO_PIN_1 /* blue */
-	#define LEDTX_Mode				 GPIO_MODE_OUTPUT_PP
-	#define LEDTX_Active_High		 0
 
 #elif defined(BOARD_canalyze)
 	#define USBD_PRODUCT_STRING_FS	 "CANAlyze gs_usb"

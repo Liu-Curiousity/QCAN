@@ -27,16 +27,16 @@ THE SOFTWARE.
 #include <string.h>
 
 #include "led.h"
-#include "gpio_.h"
 #include "util.h"
+#include "stm32f0xx_hal.h"
 
 #define SEQ_ISPASSED(now, target) ((int32_t) ((now) - (target)) >= 0)
 
 void led_init(
 	led_data_t *leds,
-	void* led_rx_port, uint16_t led_rx_pin, bool led_rx_active_high,
-	void* led_tx_port, uint16_t led_tx_pin, bool led_tx_active_high
-	) {
+	GPIO_TypeDef *led_rx_port, uint16_t led_rx_pin, bool led_rx_active_high,
+	GPIO_TypeDef *led_tx_port, uint16_t led_tx_pin, bool led_tx_active_high
+) {
 	memset(leds, 0, sizeof(led_data_t));
 	leds->led_state[LED_RX].port = led_rx_port;
 	leds->led_state[LED_RX].pin = led_rx_pin;
@@ -85,9 +85,10 @@ void led_run_sequence(led_data_t *leds, const led_seq_step_t *sequence, int32_t 
 }
 
 void led_indicate_trx(led_data_t *leds, led_num_t num) {
-	leds->led_state[num].blink_request = 1;
+	leds->led_state[num].blink_request = true;
 }
 
+// led闪烁
 static void led_trx_blinker(led_state_t *ledstate, uint32_t now) {
 	if ( SEQ_ISPASSED(now, ledstate->on_until) &&
 		 SEQ_ISPASSED(now, ledstate->off_until) ) {

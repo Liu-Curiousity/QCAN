@@ -26,7 +26,6 @@ THE SOFTWARE.
 
 #pragma once
 
-#include "bxcan.h"
 #include "config.h"
 #include "gs_usb.h"
 

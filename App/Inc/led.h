@@ -26,59 +26,168 @@ THE SOFTWARE.
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
+#include <gpio.h>
 
+#ifdef __cplusplus
+class led {
+public:
+    led(const GPIO_TypeDef *port, const uint16_t pin, const bool is_active_high) :
+        port(port), pin(pin), is_active_high(is_active_high) {}
+
+    void set(bool state) const {
+        if (is_active_high) state = !state;
+        HAL_GPIO_WritePin(const_cast<GPIO_TypeDef *>(port), pin, state ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    }
+
+private:
+    const GPIO_TypeDef *port = nullptr;
+    const uint16_t pin = 0;
+    const bool is_active_high;
+};
+
+class signal_led {
+    class blink_led : public led {
+    public:
+        using led::led;
+        blink_led(const led& source) : led(source) {}
+
+        void blink(const uint32_t now, const uint32_t on_time, const uint32_t off_time) {
+            if (blink_request) {
+                blink_request = false;
+                if (now > on_until && now > off_until) {
+                    off_until = now + off_time;
+                    on_until = off_until + on_time;
+                }
+            }
+            this->set(now > off_until);
+        }
+
+        bool blink_request{false};
+
+    private:
+        uint32_t on_until{0};
+        uint32_t off_until{0};
+    };
+
+public:
+    constexpr static uint32_t NORMAL_ON_TIME = 15;      // led blink on time in ms
+    constexpr static uint16_t NORMAL_OFF_TIME = 30;     // led blink off time in ms
+    constexpr static uint32_t ERROR_ON_TIME = 100;      // led blink on time in ms
+    constexpr static uint16_t ERROR_OFF_TIME = 100;     // led blink off time in ms
+    constexpr static uint32_t CONTINUES_ON_TIME = 100;  // led blink on time in ms
+    constexpr static uint16_t CONTINUES_OFF_TIME = 100; // led blink off time in ms
+
+    enum led_num {
+        LED_RX = 0,
+        LED_TX = 1,
+        LED_MAX
+    };
+
+    enum class Mode {
+        OFF,
+        NORMAL,
+        ERROR,
+        CONTINUES
+    };
+
+    signal_led(const led led_rx, const led led_tx) : leds{[LED_RX] = led_rx, [LED_TX] = led_tx} {}
+
+    Mode mode{Mode::OFF};
+
+    void blink_request(const led_num num) {
+        leds[num].blink_request = true;
+    }
+
+    void update() {
+        const uint32_t now = HAL_GetTick();
+        switch (mode) {
+            case Mode::OFF:
+                leds[LED_RX].set(false);
+                leds[LED_TX].set(false);
+                break;
+
+            case Mode::NORMAL:
+                leds[LED_RX].blink(now, NORMAL_ON_TIME, NORMAL_OFF_TIME);
+                leds[LED_TX].blink(now, NORMAL_ON_TIME, NORMAL_OFF_TIME);
+                break;
+            case Mode::ERROR:
+                leds[LED_RX].blink(now, ERROR_ON_TIME, ERROR_OFF_TIME);
+                blink_request(LED_RX);
+                leds[LED_TX].set(false);
+                break;
+            case Mode::CONTINUES:
+                leds[LED_RX].blink(now, CONTINUES_ON_TIME, CONTINUES_OFF_TIME);
+                leds[LED_TX].blink(now, CONTINUES_ON_TIME, CONTINUES_OFF_TIME);
+                blink_request(LED_RX);
+                blink_request(LED_TX);
+                break;
+
+            default:
+                break;
+        }
+    }
+
+private:
+    blink_led leds[LED_MAX];
+};
+
+extern "C" {
+#endif
+
+#include <stdint.h>
 
 #define LED_UPDATE_INTERVAL 10  // number of ticks from HAL_GetTick
 
 typedef enum {
-	LED_MODE_OFF,
-	LED_MODE_NORMAL,
-	LED_MODE_WARN,
-	LED_MODE_ERROR,
-	LED_MODE_SEQUENCE
+    LED_MODE_OFF,
+    LED_MODE_NORMAL,
+    LED_MODE_WARN,
+    LED_MODE_ERROR,
+    LED_MODE_SEQUENCE
 } led_mode_t;
 
 typedef enum {
-	LED_RX = 0, //will also index into array led_state[]
-	LED_TX,
-	LED_MAX
+    LED_RX = 0, //will also index into array led_state[]
+    LED_TX,
+    LED_MAX
 } led_num_t;
 
 typedef struct {
-	uint8_t state;
-	uint8_t time_in_10ms;
+    uint8_t state;
+    uint8_t time_in_10ms;
 } led_seq_step_t;
 
 typedef struct {
-	void* port;
-	uint16_t pin;
-	bool is_active_high;
+    GPIO_TypeDef *port;
+    uint16_t pin;
+    bool is_active_high;
 
-	bool blink_request;
-	uint32_t on_until;
-	uint32_t off_until;
+    bool blink_request; // 需要闪烁标志
+    uint32_t on_until;
+    uint32_t off_until;
 } led_state_t;
 
 typedef struct {
-	led_mode_t mode;
+    led_mode_t mode;
 
-	const led_seq_step_t *sequence;
-	uint32_t sequence_step;
-	uint32_t t_sequence_next;
-	int32_t seq_num_repeat;
+    const led_seq_step_t *sequence;
+    uint32_t sequence_step;
+    uint32_t t_sequence_next;
+    int32_t seq_num_repeat;
 
-	led_state_t led_state[LED_MAX];
+    led_state_t led_state[LED_MAX];
 } led_data_t;
 
-
 void led_init(
-	led_data_t *leds,
-	void* led_rx_port, uint16_t led_rx_pin, bool led_rx_active_high,
-	void* led_tx_port, uint16_t led_tx_pin, bool led_tx_active_high
-	);
-void led_set_mode(led_data_t *leds,led_mode_t mode);
+    led_data_t *leds,
+    GPIO_TypeDef *led_rx_port, uint16_t led_rx_pin, bool led_rx_active_high,
+    GPIO_TypeDef *led_tx_port, uint16_t led_tx_pin, bool led_tx_active_high
+);
+void led_set_mode(led_data_t *leds, led_mode_t mode);
 void led_run_sequence(led_data_t *leds, const led_seq_step_t *sequence, int32_t num_repeat);
 void led_indicate_trx(led_data_t *leds, led_num_t num);
 void led_update(led_data_t *leds);
+
+#ifdef __cplusplus
+}
+#endif

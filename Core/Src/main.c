@@ -27,11 +27,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "usbd_composite.h"
-#include "can_common.h"
-#include "usbd_core.h"
-#include "usbd_desc.h"
-#include "usbd_gs_can.h"
 
 /* USER CODE END Includes */
 
@@ -53,14 +48,13 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-static USBD_COMPOSITE_HandleTypeDef hGS_CAN;
-static USBD_HandleTypeDef hUSB;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void app_main();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -103,64 +97,13 @@ int main(void)
   MX_USB_PCD_Init();
   MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
-
+  app_main();
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-  INIT_LIST_HEAD(&hGS_CAN.list_frame_pool);
-  INIT_LIST_HEAD(&hGS_CAN.list_to_host);
-
-  for (unsigned i = 0; i < ARRAY_SIZE(hGS_CAN.msgbuf); i++) {
-    list_add_tail(&hGS_CAN.msgbuf[i].list, &hGS_CAN.list_frame_pool);
-  }
-
-  for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
-    can_data_t *channel = &hGS_CAN.channels[i];
-
-    channel->nr = i;
-
-    INIT_LIST_HEAD(&channel->list_from_host);
-
-    led_init(&channel->leds,
-         LEDRX_GPIO_Port, LEDRX_Pin, LEDRX_Active_High,
-         LEDTX_GPIO_Port, LEDTX_Pin, LEDTX_Active_High);
-
-    channel->hcan = &hcan;
-    can_disable(&hGS_CAN, channel);
-  }
-
-  USBD_Init(&hUSB, (USBD_DescriptorsTypeDef *)&FS_Desc, DEVICE_FS);
-  USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
-  USBD_GS_CAN_Init_(&hGS_CAN, &hUSB);
-  USBD_Start(&hUSB);
-
-  /* nice wake-up pattern */
-  for (uint8_t j = 0; j < 10; j++) {
-    HAL_GPIO_TogglePin(LEDRX_GPIO_Port, LEDRX_Pin);
-    HAL_Delay(50);
-    HAL_GPIO_TogglePin(LEDTX_GPIO_Port, LEDTX_Pin);
-  }
   while (1)
   {
-    for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
-      can_data_t *channel = &hGS_CAN.channels[i];
-
-      CAN_SendFrame(&hGS_CAN, channel);
-    }
-
-    USBD_GS_CAN_ReceiveFromHost(&hUSB);
-    USBD_GS_CAN_SendToHost(&hUSB);
-
-    for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
-      can_data_t *channel = &hGS_CAN.channels[i];
-
-      CAN_ReceiveFrame(&hGS_CAN, channel);
-      CAN_HandleError(&hGS_CAN, channel);
-
-      led_update(&channel->leds);
-    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

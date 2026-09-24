@@ -25,6 +25,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -84,3 +88,7 @@ enum gs_can_state can_drv_get_state(const struct can_channel *channel);
 void can_drv_handle_state_change(const struct can_channel *channel, struct gs_host_frame *frame);
 
 void can_drv_handle_bus_off_recovery(struct can_channel *channel);
+
+#ifdef __cplusplus
+}
+#endif

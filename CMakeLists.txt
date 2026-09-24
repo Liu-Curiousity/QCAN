@@ -46,7 +46,7 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 # 添加App/Src下的所有.c文件
-file(GLOB_RECURSE APP_SRC_FILES "App/Src/*.c")
+file(GLOB_RECURSE APP_SRC_FILES "App/Src/*.c" "App/Src/*.cpp")
 
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
