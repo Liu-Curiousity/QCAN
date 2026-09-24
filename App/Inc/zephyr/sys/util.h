@@ -66,4 +66,8 @@ extern "C" {
 
 #endif /* __cplusplus */
 
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* ZEPHYR_INCLUDE_SYS_UTIL_H_ */

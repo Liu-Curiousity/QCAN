@@ -13,7 +13,7 @@ static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
             hcan->dfu_detach_requested = true;
             break;
         case USB_DFU_REQ_GETSTATUS: {
-            struct dfu_status *status = &ep0->dfu_status;
+            struct dfu_status *status = &ep0->data.dfu_status;
 
             status->status = ERR_OK;
             status->poll_timeout[0] = 0x0;
@@ -22,7 +22,7 @@ static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
             status->state = APP_IDLE;
             status->stringidx = 0xff; // status string descriptor index
 
-            USBD_CtlSendData(pdev, ep0->buf, sizeof(ep0->dfu_status));
+            USBD_CtlSendData(pdev, ep0->buf, sizeof(ep0->data.dfu_status));
             break;
         }
         default:

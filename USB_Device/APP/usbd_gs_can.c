@@ -149,13 +149,13 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 	switch (req->bRequest) {
 		// Host -> Device
 		case GS_USB_BREQ_HOST_FORMAT:
-			len = sizeof(ep0->config);
+			len = sizeof(ep0->data.config);
 			break;
 		case GS_USB_BREQ_BITTIMING:
-			len = sizeof(ep0->bittiming);
+			len = sizeof(ep0->data.bittiming);
 			break;
 		case GS_USB_BREQ_MODE:
-			len = sizeof(ep0->mode);
+			len = sizeof(ep0->data.mode);
 			break;
 		case GS_USB_BREQ_BT_CONST:
 			src = &CAN_btconst;
@@ -170,27 +170,27 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 			len = sizeof(hcan->sof_timestamp_us);
 			break;
 		case GS_USB_BREQ_IDENTIFY:
-			len = sizeof(ep0->identify_mode);
+			len = sizeof(ep0->data.identify_mode);
 			break;
 		case GS_USB_BREQ_DATA_BITTIMING:
-			len = sizeof(ep0->bittiming);
+			len = sizeof(ep0->data.bittiming);
 			break;
 		case GS_USB_BREQ_BT_CONST_EXT:
 			src = &CAN_btconst_ext;
 			len = sizeof(CAN_btconst_ext);
 			break;
 		case GS_USB_BREQ_SET_TERMINATION:
-			len = sizeof(ep0->term_state);
+			len = sizeof(ep0->data.term_state);
 			break;
 		case GS_USB_BREQ_GET_TERMINATION:
-			ep0->term_state.state = get_term(channel);
-			src = &ep0->term_state;
-			len = sizeof(ep0->term_state);
+			ep0->data.term_state.state = get_term(channel);
+			src = &ep0->data.term_state;
+			len = sizeof(ep0->data.term_state);
 			break;
 		case GS_USB_BREQ_GET_STATE:
-			can_get_device_state(channel, &ep0->state);
-			src = &ep0->state;
-			len = sizeof(ep0->state);
+			can_get_device_state(channel, &ep0->data.state);
+			src = &ep0->data.state;
+			len = sizeof(ep0->data.state);
 			break;
 		default:
 			goto out_fail;
@@ -278,11 +278,11 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			 */
 			break;
 		case GS_USB_BREQ_BITTIMING: {
-			if (!can_set_bittiming(channel, &ep0->bittiming)) goto out_fail;
+			if (!can_set_bittiming(channel, &ep0->data.bittiming)) goto out_fail;
 			break;
 		}
 		case GS_USB_BREQ_MODE: {
-			const struct gs_device_mode *mode = &ep0->mode;
+			const struct gs_device_mode *mode = &ep0->data.mode;
 
 			if (mode->mode == GS_CAN_MODE_RESET) {
 				can_disable(hcan, channel);
@@ -292,7 +292,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			break;
 		}
 		case GS_USB_BREQ_IDENTIFY: {
-			if (ep0->identify_mode.mode) {
+			if (ep0->data.identify_mode.mode) {
 				led_set_mode(&channel->leds, LED_MODE_SEQUENCE);
 			} else {
 				led_set_mode(&channel->leds, can_is_enabled(channel) ? LED_MODE_NORMAL : LED_MODE_OFF);
@@ -300,11 +300,11 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			break;
 		}
 		case GS_USB_BREQ_DATA_BITTIMING: {
-			if (!can_set_data_bittiming(channel, &ep0->bittiming)) goto out_fail;
+			if (!can_set_data_bittiming(channel, &ep0->data.bittiming)) goto out_fail;
 			break;
 		}
 		case GS_USB_BREQ_SET_TERMINATION: {
-			set_term(channel, ep0->term_state.state);
+			set_term(channel, ep0->data.term_state.state);
 			break;
 		}
 		default:

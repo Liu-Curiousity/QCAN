@@ -111,6 +111,8 @@ private:
     blink_led leds[LED_MAX];
 };
 
+extern signal_led led;
+
 extern "C" {
 #endif
 
@@ -133,7 +135,6 @@ typedef struct {
 
 void led_set_mode(led_data_t *leds, led_mode_t mode);
 void led_indicate_trx(led_data_t *leds, led_num_t num);
-void led_update(led_data_t *leds);
 
 #ifdef __cplusplus
 }

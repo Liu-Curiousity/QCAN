@@ -25,10 +25,6 @@
 
 #pragma once
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -36,7 +32,13 @@ extern "C" {
 #include "gs_usb.h"
 #include "stm32f0xx_hal.h"
 #include "led.h"
+#define new new_
 #include "list.h"
+#undef new
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct can_drv_reg_status {
 #if defined (CONFIG_BXCAN)

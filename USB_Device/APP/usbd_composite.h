@@ -34,7 +34,9 @@
 #include "compiler.h"
 #include "config.h"
 #include "gs_usb.h"
+#define new new_
 #include "list.h"
+#undef new
 
 /* Define these here so they can be referenced in other files */
 #ifdef CONFIG_CANFD
@@ -71,24 +73,27 @@ struct gs_host_frame_object {
 	};
 };
 
+union ep0 {
+	union ep0_data {
+		// Device -> Host
+		struct dfu_status dfu_status;
+		struct gs_device_state state;
+
+		// Host -> Device
+		struct gs_host_config config;
+		struct gs_device_bittiming bittiming;
+		struct gs_device_mode mode;
+		struct gs_identify_mode identify_mode;
+
+		// Device <-> Host
+		struct gs_device_termination_state term_state;
+	} data;
+
+	uint8_t __aligned(4) buf[sizeof(union ep0_data)];
+};
+
 typedef struct {
-	union ep0 {
-		struct_group_tagged(ep0_data, data, union {
-			// Device -> Host
-			struct dfu_status dfu_status;
-			struct gs_device_state state;
-
-			// Host -> Device
-			const struct gs_host_config config;
-			const struct gs_device_bittiming bittiming;
-			const struct gs_device_mode mode;
-			const struct gs_identify_mode identify_mode;
-
-			// Device <-> Host
-			struct gs_device_termination_state term_state;
-		}; );
-		uint8_t __aligned(4) buf[sizeof(struct ep0_data)];
-	} ep0;
+	union ep0 ep0;
 
 	USBD_SetupReqTypedef last_setup_request;
 

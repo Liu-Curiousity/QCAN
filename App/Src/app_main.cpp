@@ -8,7 +8,7 @@
 static USBD_COMPOSITE_HandleTypeDef hGS_CAN;
 static USBD_HandleTypeDef hUSB;
 
-void app_main() {
+extern "C" void app_main() {
     INIT_LIST_HEAD(&hGS_CAN.list_frame_pool);
     INIT_LIST_HEAD(&hGS_CAN.list_to_host);
 
@@ -47,7 +47,7 @@ void app_main() {
             CAN_ReceiveFrame(&hGS_CAN, channel);
             CAN_HandleError(&hGS_CAN, channel);
 
-            led_update(&channel->leds);
+            led.update();
         }
     }
 }

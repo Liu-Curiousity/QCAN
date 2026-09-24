@@ -31,6 +31,10 @@
 #include "bxcan.h"
 #include "usbd_composite.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CAN_LEC_NO_ERROR	0
 #define CAN_LEC_STUFF_ERROR 1
 #define CAN_LEC_FORM_ERROR	2
@@ -58,3 +62,7 @@ void can_schedule_bus_off_recovery(struct can_channel *channel, uint32_t delay_m
 void CAN_SendFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);
 void CAN_ReceiveFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);
 void CAN_HandleError(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);
+
+#ifdef __cplusplus
+}
+#endif
