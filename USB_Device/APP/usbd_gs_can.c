@@ -3,14 +3,15 @@
 #include <string.h>
 #include <usbd_core.h>
 
-#include "usbd_composite.h"
 #include "can_common.h"
 #include "gpio_.h"
 #include "timer.h"
 
+extern USBD_GS_CAN_HandleTypeDef hGS_CAN;
+
 volatile bool is_usb_suspend_cb;
 
-static can_data_t* USBD_GS_CAN_GetChannel(USBD_COMPOSITE_HandleTypeDef *hcan, const uint16_t ch) {
+static can_data_t* USBD_GS_CAN_GetChannel(USBD_GS_CAN_HandleTypeDef *hcan, const uint16_t ch) {
 	return ch < ARRAY_SIZE(hcan->channels) ? &hcan->channels[ch] : NULL;
 }
 
@@ -19,7 +20,7 @@ static can_data_t* USBD_GS_CAN_GetChannel(USBD_COMPOSITE_HandleTypeDef *hcan, co
 // was changed and is now ready, meaning and RX can be
 // re-enabled, false otherwise.
 // Must be called with IRQ disabled.
-static bool USBD_GS_Prefill_RX_Buffers(USBD_COMPOSITE_HandleTypeDef *hcan)
+static bool USBD_GS_Prefill_RX_Buffers(USBD_GS_CAN_HandleTypeDef *hcan)
 {
 	unsigned i;
 	bool changed;
@@ -55,8 +56,7 @@ static bool USBD_GS_Prefill_RX_Buffers(USBD_COMPOSITE_HandleTypeDef *hcan)
  */
 static inline uint8_t USBD_GS_CAN_PrepareReceive(USBD_HandleTypeDef *pdev)
 {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-	struct gs_host_frame *frame = &hcan->from_host_buf[0]->frame;
+	struct gs_host_frame *frame = &hGS_CAN.from_host_buf[0]->frame;
 	uint16_t size;
 
 	if (IS_ENABLED(CONFIG_CANFD)) {
@@ -68,7 +68,7 @@ static inline uint8_t USBD_GS_CAN_PrepareReceive(USBD_HandleTypeDef *pdev)
 	return USBD_LL_PrepareReceive(pdev, GSUSB_ENDPOINT_OUT, (uint8_t *)frame, size);
 }
 
-static void usbd_gs_can_purge_to_host_buf(USBD_COMPOSITE_HandleTypeDef *hcan)
+static void usbd_gs_can_purge_to_host_buf(USBD_GS_CAN_HandleTypeDef *hcan)
 {
 	bool was_irq_enabled = disable_irq();
 
@@ -96,9 +96,7 @@ static uint8_t USBD_GS_CAN_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 
 static uint8_t USBD_GS_CAN_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-
-	usbd_gs_can_purge_to_host_buf(hcan);
+	usbd_gs_can_purge_to_host_buf(&hGS_CAN);
 	is_usb_suspend_cb = false;
 
 	USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
@@ -106,10 +104,20 @@ static uint8_t USBD_GS_CAN_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 	return USBD_OK;
 }
 
+static bool USBD_GS_CAN_IsRequest(const USBD_SetupReqTypedef *req)
+{
+	/* Composite control callbacks are broadcast. Only handle gs_usb vendor
+	 * requests, retaining support for device-recipient requests. */
+	return (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_VENDOR &&
+		((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE ||
+		 ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE && req->wIndex == 0));
+}
+
 static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-	union ep0 *ep0 = &hcan->ep0;
+	if (!USBD_GS_CAN_IsRequest(req)) return USBD_OK;
+
+	union ep0 *ep0 = &hGS_CAN.ep0;
 	can_data_t *channel = NULL;
 	const void *src = NULL;
 	size_t len;
@@ -125,7 +133,7 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 	 *
 	 */
 	if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
-		channel = USBD_GS_CAN_GetChannel(hcan, req->wValue);
+		channel = USBD_GS_CAN_GetChannel(&hGS_CAN, req->wValue);
 		if (!channel) {
 			goto out_fail;
 		}
@@ -167,8 +175,8 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 			len = sizeof(USBD_GS_CAN_dconf);
 			break;
 		case GS_USB_BREQ_TIMESTAMP:
-			src = &hcan->sof_timestamp_us;
-			len = sizeof(hcan->sof_timestamp_us);
+			src = &hGS_CAN.sof_timestamp_us;
+			len = sizeof(hGS_CAN.sof_timestamp_us);
 			break;
 		case GS_USB_BREQ_IDENTIFY:
 			len = sizeof(ep0->data.identify_mode);
@@ -212,8 +220,8 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 				goto out_fail;
 			}
 
-			hcan->last_setup_request = *req;
-			USBD_CtlPrepareRx(pdev, hcan->ep0.buf, req->wLength);
+			hGS_CAN.last_setup_request = *req;
+			USBD_CtlPrepareRx(pdev, hGS_CAN.ep0.buf, req->wLength);
 			break;
 
 		// Device -> Host
@@ -237,10 +245,12 @@ out_fail:
 }
 
 static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
+	/* Use the current transfer, not a saved request from a previous CAN write. */
+	if (!USBD_GS_CAN_IsRequest(&pdev->request)) return USBD_OK;
+
 	can_data_t *channel = NULL;
-	USBD_SetupReqTypedef *req = &hcan->last_setup_request;
-	const union ep0 *ep0 = &hcan->ep0;
+	USBD_SetupReqTypedef *req = &hGS_CAN.last_setup_request;
+	const union ep0 *ep0 = &hGS_CAN.ep0;
 
 	/*
 	 * The control messages GS_USB_BREQ_HOST_FORMAT and
@@ -249,7 +259,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 	 * USBD_GS_CAN_Config_Request() already.
 	 */
 	if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG))
-		channel = USBD_GS_CAN_GetChannel(hcan, req->wValue);
+		channel = USBD_GS_CAN_GetChannel(&hGS_CAN, req->wValue);
 
 	if (!IS_ENABLED(CONFIG_CANFD)) {
 		switch (req->bRequest) {
@@ -286,7 +296,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			const struct gs_device_mode *mode = &ep0->data.mode;
 
 			if (mode->mode == GS_CAN_MODE_RESET) {
-				can_disable(hcan, channel);
+				can_disable(&hGS_CAN, channel);
 			} else if (mode->mode == GS_CAN_MODE_START) {
 				if (!can_enable(channel, mode->feature)) goto out_fail;
 			}
@@ -321,11 +331,11 @@ out_fail:
 
 static uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
-    USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
+	if (epnum != (GSUSB_ENDPOINT_IN & 0x7F)) return USBD_OK;
 
     bool was_irq_enabled = disable_irq();
-    list_add_tail(&hcan->to_host_buf->list, &hcan->list_frame_pool);
-    hcan->to_host_buf = NULL;
+    list_add_tail(&hGS_CAN.to_host_buf->list, &hGS_CAN.list_frame_pool);
+    hGS_CAN.to_host_buf = NULL;
     restore_irq(was_irq_enabled);
 
     return USBD_OK;
@@ -333,41 +343,42 @@ static uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 
 // Note that the return value is completely ignored by the stack.
 static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
+	if (epnum != GSUSB_ENDPOINT_OUT) return USBD_OK;
+
 	can_data_t *channel;
 
 	/* If we do not have a valid incoming frame pointer, something broke. */
-	if (!hcan->from_host_buf[0])
+	if (!hGS_CAN.from_host_buf[0])
 		__BKPT(0);
 
 	uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
-	if (rxlen < (struct_size(&hcan->from_host_buf[0]->frame, classic_can, 1))) {
+	if (rxlen < (struct_size(&hGS_CAN.from_host_buf[0]->frame, classic_can, 1))) {
 		// Invalid frame length, just ignore it and receive into the same buffer
 		// again next time.
 		goto out_prepare_receive;
 	}
 
-	channel = USBD_GS_CAN_GetChannel(hcan, hcan->from_host_buf[0]->frame.channel);
+	channel = USBD_GS_CAN_GetChannel(&hGS_CAN, hGS_CAN.from_host_buf[0]->frame.channel);
 	if (!channel) {
 		goto out_prepare_receive;
 	}
 
 	if (IS_ENABLED(CONFIG_CANFD) &&
-		hcan->from_host_buf[0]->frame.flags & GS_CAN_FLAG_FD &&
-		rxlen < struct_size(&hcan->from_host_buf[0]->frame, canfd, 1)) {
+		hGS_CAN.from_host_buf[0]->frame.flags & GS_CAN_FLAG_FD &&
+		rxlen < struct_size(&hGS_CAN.from_host_buf[0]->frame, canfd, 1)) {
 		goto out_prepare_receive;
 	}
 
 	bool was_irq_enabled = disable_irq();
 	// Enqueue the frame we just received.
-	list_add_tail(&hcan->from_host_buf[0]->list, &channel->list_from_host);
+	list_add_tail(&hGS_CAN.from_host_buf[0]->list, &channel->list_from_host);
 
 	int last;
-	for (last = 0; last < (int)ARRAY_SIZE(hcan->from_host_buf) - 1; ++last)
-		hcan->from_host_buf[last] = hcan->from_host_buf[last + 1];
-	hcan->from_host_buf[last] = NULL;
+	for (last = 0; last < (int)ARRAY_SIZE(hGS_CAN.from_host_buf) - 1; ++last)
+		hGS_CAN.from_host_buf[last] = hGS_CAN.from_host_buf[last + 1];
+	hGS_CAN.from_host_buf[last] = NULL;
 
-	bool rx_ready = USBD_GS_Prefill_RX_Buffers(hcan);
+	bool rx_ready = USBD_GS_Prefill_RX_Buffers(&hGS_CAN);
 
 	if (rx_ready) {
 		restore_irq(was_irq_enabled);
@@ -394,8 +405,8 @@ static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 out_prepare_receive:
 	// We can not unconditionally re-enable RX if the pre-allocated
 	// buffers are not fully ready.
-	for (unsigned i = 0; i < ARRAY_SIZE(hcan->from_host_buf); ++i) {
-		if (!hcan->from_host_buf[i])
+	for (unsigned i = 0; i < ARRAY_SIZE(hGS_CAN.from_host_buf); ++i) {
+		if (!hGS_CAN.from_host_buf[i])
 			return USBD_OK;
 	}
 	USBD_GS_CAN_PrepareReceive(pdev);
@@ -404,8 +415,7 @@ out_prepare_receive:
 }
 
 static uint8_t USBD_GS_CAN_SOF(struct _USBD_HandleTypeDef *pdev) {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-	hcan->sof_timestamp_us = timer_get();
+	hGS_CAN.sof_timestamp_us = timer_get();
 	return USBD_OK;
 }
 
@@ -421,13 +431,11 @@ USBD_ClassTypeDef USBD_GS_CAN = {
 
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev)
 {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-
 	bool was_irq_enabled = disable_irq();
 
 	// Reserve the multiple RX buffers we need to ensure no frame loss
 	// with OUT endpoint double-buffering before (re)starting the RX. */
-	bool rx_ready = USBD_GS_Prefill_RX_Buffers(hcan);
+	bool rx_ready = USBD_GS_Prefill_RX_Buffers(&hGS_CAN);
 
 	if (rx_ready)
 		USBD_GS_CAN_PrepareReceive(pdev);
@@ -448,8 +456,7 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
 static uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev,
 									 struct gs_host_frame_object *frame_object)
 {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-	const can_data_t *channel = &hcan->channels[frame_object->frame.channel];
+	const can_data_t *channel = &hGS_CAN.channels[frame_object->frame.channel];
 	const struct gs_host_frame *frame = &frame_object->frame;
 	uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];
 	uint8_t *send_addr;
@@ -497,26 +504,24 @@ static uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev,
 
 void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev)
 {
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-
 	bool was_irq_enabled = disable_irq();
-	if (hcan->to_host_buf) {
+	if (hGS_CAN.to_host_buf) {
 		restore_irq(was_irq_enabled);
 		return;
 	}
 
-	hcan->to_host_buf = list_first_entry_or_null(&hcan->list_to_host,
+	hGS_CAN.to_host_buf = list_first_entry_or_null(&hGS_CAN.list_to_host,
 												 struct gs_host_frame_object,
 												 list);
-	if (!hcan->to_host_buf) {
+	if (!hGS_CAN.to_host_buf) {
 		restore_irq(was_irq_enabled);
 		return;
 	}
 
-	list_del(&hcan->to_host_buf->list);
+	list_del(&hGS_CAN.to_host_buf->list);
 	restore_irq(was_irq_enabled);
 
-	uint8_t result = USBD_GS_CAN_SendFrame(pdev, hcan->to_host_buf);
+	uint8_t result = USBD_GS_CAN_SendFrame(pdev, hGS_CAN.to_host_buf);
 	if (result == USBD_OK)
 		return;
 
@@ -528,30 +533,21 @@ void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev)
 	 * USBD_GS_CAN_DeInit().
 	 */
 	was_irq_enabled = disable_irq();
-	if (hcan->to_host_buf) {
-		list_add_tail(&hcan->to_host_buf->list, &hcan->list_frame_pool);
-		hcan->to_host_buf = NULL;
+	if (hGS_CAN.to_host_buf) {
+		list_add_tail(&hGS_CAN.to_host_buf->list, &hGS_CAN.list_frame_pool);
+		hGS_CAN.to_host_buf = NULL;
 	}
 	restore_irq(was_irq_enabled);
-}
-
-bool USBD_GS_CAN_DfuDetachRequested(USBD_HandleTypeDef *pdev)
-{
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
-
-	return hcan->dfu_detach_requested;
 }
 
 // Handle USB suspend event
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev)
 {
 	// Disable CAN and go off bus on USB suspend
-	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
+	for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
+		can_data_t *channel = &hGS_CAN.channels[i];
 
-	for (unsigned int i = 0; i < ARRAY_SIZE(hcan->channels); i++) {
-		can_data_t *channel = &hcan->channels[i];
-
-		can_disable(hcan, channel);
+		can_disable(&hGS_CAN, channel);
 	}
 
 	is_usb_suspend_cb = true;

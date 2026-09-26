@@ -14,8 +14,10 @@
 #ifndef ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H
 #define ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <usbd_def.h>
+#include "compiler.h"
 
 #define DFU_INTERFACE_NUM		 1
 #define DFU_INTERFACE_STR_INDEX	 0xE0
@@ -46,14 +48,16 @@ struct usb_dfu_descriptor {
     uint16_t wDetachTimeOut;
     uint16_t wTransferSize;
     uint16_t bcdDFUVersion;
-} __packed;
+}
+    __packed;
 
 struct dfu_status {
     uint8_t status;
     uint8_t poll_timeout[3];
     uint8_t state;
     uint8_t stringidx;
-} __packed;
+}
+    __packed;
 
 /* DFU Functional Descriptor Type */
 #define USB_DESC_DFU_FUNCTIONAL 0x21
@@ -102,6 +106,16 @@ enum usb_dfu_state {
     DFU_ERROR = 10,
     DFU_STATE_MAX = 11,
 };
+
+typedef struct {
+    union {
+        struct dfu_status dfu_status;
+        uint8_t buf[sizeof(struct dfu_status)];
+    } ep0;
+
+    bool dfu_detach_requested;
+} USBD_DFU_HandleTypeDef __attribute__ ((aligned (4)));
+
 
 extern USBD_ClassTypeDef USBD_DFU;
 

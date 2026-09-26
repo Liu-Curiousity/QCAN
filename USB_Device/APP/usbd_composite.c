@@ -23,26 +23,24 @@
  * THE SOFTWARE.
  *
  */
+#include "usbd_composite.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#include "can.h"
-#include "can_common.h"
-#include "compiler.h"
 #include "config.h"
-#include "gs_usb.h"
 #include "usbd_core.h"
 #include "usbd_ctlreq.h"
 #include "usbd_def.h"
 #include "usbd_desc.h"
-#include "usbd_dfu.h"
-#include "usbd_composite.h"
 
+#include "usbd_dfu.h"
 #include "usbd_cdc_if.h"
 #include "usbd_gs_can.h"
-#include "usbd_ioreq.h"
-#include "util.h"
+
+USBD_COMPOSITE_HandleTypeDef hcomposite = {
+	.pClass = {&USBD_CDC, &USBD_DFU, &USBD_GS_CAN},
+};
 
 #define CDC_INTERFACE_STRING_FS	 "qcan cdc"
 
@@ -290,63 +288,79 @@ __ALIGN_BEGIN static uint8_t USBD_MS_EXT_PROP_FEATURE_DESC[] __ALIGN_END= {
 
 static uint8_t USBD_COMPOSITE_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 	uint8_t ret = USBD_OK;
-	if (USBD_GS_CAN.Init != NULL) ret |= USBD_GS_CAN.Init(pdev, cfgidx);
-	if (USBD_CDC.Init != NULL) ret |= USBD_CDC.Init(pdev, cfgidx);
-	if (USBD_DFU.Init != NULL) ret |= USBD_DFU.Init(pdev, cfgidx);
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->Init != NULL) {
+			ret |= device->pClass[i]->Init(pdev, cfgidx);
+		}
+	}
 	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 	uint8_t ret = USBD_OK;
-	if (USBD_GS_CAN.DeInit != NULL) ret |= USBD_GS_CAN.DeInit(pdev, cfgidx);
-	if (USBD_CDC.DeInit != NULL) ret |= USBD_CDC.DeInit(pdev, cfgidx);
-	if (USBD_DFU.DeInit != NULL) ret |= USBD_DFU.DeInit(pdev, cfgidx);
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->DeInit != NULL) {
+			ret |= device->pClass[i]->DeInit(pdev, cfgidx);
+		}
+	}
 	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
-	if ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
-	    (req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE)) {
-		if (USBD_CDC.Setup != NULL) return USBD_CDC.Setup(pdev, req);
-	} else if ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&     // recipient: interface
-	           (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && // class request
-	           req->wIndex == DFU_INTERFACE_NUM) {
-		if (USBD_DFU.Setup != NULL) return USBD_DFU.Setup(pdev, req);
-	} else {
-		if (USBD_GS_CAN.Setup != NULL) return USBD_GS_CAN.Setup(pdev, req);
+	uint8_t ret = USBD_OK;
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->Setup != NULL) {
+			ret |= device->pClass[i]->Setup(pdev, req);
+		}
 	}
-	return USBD_OK;
+	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_EP0_RxReady(USBD_HandleTypeDef *pdev) {
-	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
-	    (pdev->request.wIndex == CDC_CONTROL_INTERFACE || pdev->request.wIndex == CDC_DATA_INTERFACE))
-		if (USBD_CDC.EP0_RxReady != NULL) return USBD_CDC.EP0_RxReady(pdev);
-	if (USBD_GS_CAN.EP0_RxReady != NULL) return USBD_GS_CAN.EP0_RxReady(pdev);
-	return USBD_OK;
+	uint8_t ret = USBD_OK;
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->EP0_RxReady != NULL) {
+			ret |= device->pClass[i]->EP0_RxReady(pdev);
+		}
+	}
+	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
-	if (epnum == (CDC_IN_EP & 0x7F))
-		if (USBD_CDC.DataIn != NULL) return USBD_CDC.DataIn(pdev, epnum);
-	if (epnum == (GSUSB_ENDPOINT_IN & 0x7F))
-		if (USBD_GS_CAN.DataIn != NULL) return USBD_GS_CAN.DataIn(pdev, epnum);
-	return USBD_OK;
+	uint8_t ret = USBD_OK;
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->DataIn != NULL) {
+			ret |= device->pClass[i]->DataIn(pdev, epnum);
+		}
+	}
+	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
-	if (epnum == CDC_OUT_EP)
-		if (USBD_CDC.DataOut != NULL) return USBD_CDC.DataOut(pdev, epnum);
-	if (epnum == GSUSB_ENDPOINT_OUT)
-		if (USBD_GS_CAN.DataOut != NULL) return USBD_GS_CAN.DataOut(pdev, epnum);
-	return USBD_OK;
+	uint8_t ret = USBD_OK;
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->DataOut != NULL) {
+			ret |= device->pClass[i]->DataOut(pdev, epnum);
+		}
+	}
+	return ret;
 }
 
 static uint8_t USBD_COMPOSITE_SOF(struct _USBD_HandleTypeDef *pdev) {
-	if (USBD_GS_CAN.SOF != NULL) return USBD_GS_CAN.SOF(pdev);
-	if (USBD_CDC.SOF != NULL) return USBD_CDC.SOF(pdev);
-	if (USBD_DFU.SOF != NULL) return USBD_DFU.SOF(pdev);
-	return USBD_OK;
+	uint8_t ret = USBD_OK;
+	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
+	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
+		if (device->pClass[i] != NULL && device->pClass[i]->SOF != NULL) {
+			ret |= device->pClass[i]->SOF(pdev);
+		}
+	}
+	return ret;
 }
 
 static uint8_t *USBD_COMPOSITE_GetCfgDesc(uint16_t *length)

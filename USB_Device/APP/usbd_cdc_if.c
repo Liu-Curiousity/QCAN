@@ -55,6 +55,10 @@ uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 
 static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
 {
+    if (!((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
+          (req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE)))
+        return USBD_OK;
+
     if (pdev->dev_state != USBD_STATE_CONFIGURED)
         goto fail;
     if (req->bmRequest == 0x21 && req->wIndex == CDC_CONTROL_INTERFACE) {
@@ -94,6 +98,10 @@ fail:
 
 static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
 {
+    if (!((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
+        (pdev->request.wIndex == CDC_CONTROL_INTERFACE || pdev->request.wIndex == CDC_DATA_INTERFACE)))
+        return USBD_OK;
+
     if (pdev->request.bmRequest != 0x21 || pdev->request.bRequest != 0x20 ||
         pdev->request.wIndex != CDC_CONTROL_INTERFACE || pdev->request.wLength != 7)
         return USBD_FAIL;
@@ -103,6 +111,8 @@ static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
 
 static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 {
+    if (epnum != (CDC_IN_EP & 0x7F)) return USBD_OK;
+
     if (tx_zlp) {
         tx_zlp = false;
         uint8_t result = USBD_LL_Transmit(pdev, CDC_IN_EP, tx_buffer, 0);
@@ -114,8 +124,9 @@ static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
     return USBD_OK;
 }
 
-static uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
-{
+static uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+    if (epnum != CDC_OUT_EP) return USBD_OK;
+
     rx_offset = 0;
     rx_length = (uint16_t)USBD_LL_GetRxDataSize(pdev, CDC_OUT_EP);
     if (rx_length == 0)

@@ -30,7 +30,6 @@
 
 #include "config.h"
 #include "gs_usb.h"
-#include "stm32f0xx_hal.h"
 #include "led.h"
 #define new new_
 #include "list.h"

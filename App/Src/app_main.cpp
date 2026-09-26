@@ -5,7 +5,8 @@
 #include "usbd_desc.h"
 #include "usbd_gs_can.h"
 
-static USBD_COMPOSITE_HandleTypeDef hGS_CAN;
+extern USBD_COMPOSITE_HandleTypeDef hcomposite;
+USBD_GS_CAN_HandleTypeDef hGS_CAN;
 static USBD_HandleTypeDef hUSB;
 
 extern "C" void app_main() {
@@ -29,7 +30,7 @@ extern "C" void app_main() {
 
     USBD_Init(&hUSB, &FS_Desc, DEVICE_FS);
     USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
-    hUSB.pClassData = &hGS_CAN; // TODO: 补齐初始化
+    hUSB.pClassData = &hcomposite;
     USBD_Start(&hUSB);
     while (true) {
         for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {

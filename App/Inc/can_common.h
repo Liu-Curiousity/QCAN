@@ -29,7 +29,7 @@
 #include <stdint.h>
 
 #include "bxcan.h"
-#include "usbd_composite.h"
+#include "usbd_gs_can.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,7 +49,7 @@ bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_
 
 bool can_is_enabled(const struct can_channel *channel);
 bool can_enable(struct can_channel *channel, uint32_t feature);
-void can_disable(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel);
+void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel);
 void can_get_device_state(const struct can_channel *channel, struct gs_device_state *state);
 
 enum gs_can_state can_err_to_state(const uint16_t err);
@@ -59,9 +59,9 @@ void can_lec_error_to_frame(struct gs_host_frame *frame, const uint8_t lec);
 
 void can_schedule_bus_off_recovery(struct can_channel *channel, uint32_t delay_ms);
 
-void CAN_SendFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);
-void CAN_ReceiveFrame(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);
-void CAN_HandleError(USBD_COMPOSITE_HandleTypeDef *hcan, can_data_t *channel);
+void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
+void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
+void CAN_HandleError(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
 
 #ifdef __cplusplus
 }
