@@ -3,6 +3,7 @@
 #include <string.h>
 #include <usbd_core.h>
 
+#include "usbd_composite.h"
 #include "can_common.h"
 #include "gpio_.h"
 #include "timer.h"
@@ -418,13 +419,6 @@ USBD_ClassTypeDef USBD_GS_CAN = {
 	.SOF = USBD_GS_CAN_SOF,
 };
 
-uint8_t USBD_GS_CAN_Init_(USBD_COMPOSITE_HandleTypeDef *hcan, USBD_HandleTypeDef *pdev)
-{
-	pdev->pClassData = hcan;
-
-	return USBD_OK;
-}
-
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev)
 {
 	USBD_COMPOSITE_HandleTypeDef *hcan = pdev->pClassData;
@@ -566,38 +560,4 @@ void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev)
 void USBD_GS_CAN_ResumeCallback(USBD_HandleTypeDef __maybe_unused *pdev)
 {
 	is_usb_suspend_cb = false;
-}
-
-void usbd_gs_can_purge_from_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
-												 struct can_channel *channel)
-{
-	list_splice_tail_init_locked(&channel->list_from_host, &hcan->list_frame_pool);
-}
-
-void usbd_gs_can_purge_to_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
-											   const struct can_channel *channel)
-{
-	/*
-	 * If we only have one channel, all object of hcan->list_to_host belong to this one channel.
-	 * Move the complete list to the frame pool.
-	 */
-	if (NUM_CAN_CHANNEL == 1) {
-		list_splice_tail_init_locked(&hcan->list_to_host, &hcan->list_frame_pool);
-
-		return;
-	}
-
-	/*
-	 * For more than one channel, iterate over each object in hcan->list_to_host.
-	 */
-	struct gs_host_frame_object *iter, *next;
-	const bool was_irq_enabled = disable_irq();
-
-	list_for_each_entry_safe(iter, next, &hcan->list_to_host, list) {
-		if (iter->frame.channel == channel->nr) {
-			list_move_tail(&iter->list, &hcan->list_frame_pool);
-		}
-	}
-
-	restore_irq(was_irq_enabled);
 }

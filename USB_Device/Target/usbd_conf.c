@@ -25,6 +25,7 @@
 #include "usbd_core.h"
 
 #include "usb.h"
+#include "gs_usb.h"
 #include "usbd_cdc_if.h"
 #include "usbd_gs_can.h"
 

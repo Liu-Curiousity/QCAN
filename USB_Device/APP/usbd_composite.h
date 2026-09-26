@@ -65,51 +65,51 @@ extern USBD_ClassTypeDef USBD_COMPOSITE;
 #endif
 
 struct gs_host_frame_object {
-	struct list_head list;
+    struct list_head list;
 
-	union {
-		uint8_t _buf[GS_HOST_FRAME_SIZE];
-		struct gs_host_frame frame;
-	};
+    union {
+        uint8_t _buf[GS_HOST_FRAME_SIZE];
+        struct gs_host_frame frame;
+    };
 };
 
 union ep0 {
-	union ep0_data {
-		// Device -> Host
-		struct dfu_status dfu_status;
-		struct gs_device_state state;
+    union ep0_data {
+        // Device -> Host
+        struct dfu_status dfu_status;
+        struct gs_device_state state;
 
-		// Host -> Device
-		struct gs_host_config config;
-		struct gs_device_bittiming bittiming;
-		struct gs_device_mode mode;
-		struct gs_identify_mode identify_mode;
+        // Host -> Device
+        struct gs_host_config config;
+        struct gs_device_bittiming bittiming;
+        struct gs_device_mode mode;
+        struct gs_identify_mode identify_mode;
 
-		// Device <-> Host
-		struct gs_device_termination_state term_state;
-	} data;
+        // Device <-> Host
+        struct gs_device_termination_state term_state;
+    } data;
 
-	uint8_t __aligned(4) buf[sizeof(union ep0_data)];
+    uint8_t __aligned(4) buf[sizeof(union ep0_data)];
 };
 
 typedef struct {
-	union ep0 ep0;
+    union ep0 ep0;
 
-	USBD_SetupReqTypedef last_setup_request;
+    USBD_SetupReqTypedef last_setup_request;
 
-	struct list_head list_frame_pool; // 共享空闲队列
-	struct list_head list_to_host;    // 向主机发送帧的队列
+    struct list_head list_frame_pool; // 共享空闲队列
+    struct list_head list_to_host;    // 向主机发送帧的队列
 
-	struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
-	struct gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
+    struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
+    struct gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
 
-	can_data_t channels[NUM_CAN_CHANNEL];
+    can_data_t channels[NUM_CAN_CHANNEL];
 
-	uint32_t sof_timestamp_us;
+    uint32_t sof_timestamp_us;
 
-	struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE];	// 共享池实际储存位置
+    struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE]; // 共享池实际储存位置
 
-	bool dfu_detach_requested;
+    bool dfu_detach_requested;
 } USBD_COMPOSITE_HandleTypeDef __attribute__ ((aligned (4)));
 
 #if defined(STM32F4)
@@ -118,4 +118,3 @@ typedef struct {
 // using (largest packet size / 4) + 1
 # define USB_RX_FIFO_SIZE ((256U / 4U) + 1U)
 #endif
-

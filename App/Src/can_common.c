@@ -98,6 +98,40 @@ bool can_enable(struct can_channel *channel, const uint32_t feature) {
 	return true;
 }
 
+void usbd_gs_can_purge_from_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
+												 struct can_channel *channel)
+{
+	list_splice_tail_init_locked(&channel->list_from_host, &hcan->list_frame_pool);
+}
+
+void usbd_gs_can_purge_to_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan,
+											   const struct can_channel *channel)
+{
+	/*
+	 * If we only have one channel, all object of hcan->list_to_host belong to this one channel.
+	 * Move the complete list to the frame pool.
+	 */
+	if (NUM_CAN_CHANNEL == 1) {
+		list_splice_tail_init_locked(&hcan->list_to_host, &hcan->list_frame_pool);
+
+		return;
+	}
+
+	/*
+	 * For more than one channel, iterate over each object in hcan->list_to_host.
+	 */
+	struct gs_host_frame_object *iter, *next;
+	const bool was_irq_enabled = disable_irq();
+
+	list_for_each_entry_safe(iter, next, &hcan->list_to_host, list) {
+		if (iter->frame.channel == channel->nr) {
+			list_move_tail(&iter->list, &hcan->list_frame_pool);
+		}
+	}
+
+	restore_irq(was_irq_enabled);
+}
+
 void can_disable(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel) {
 	can_drv_disable(channel);
 

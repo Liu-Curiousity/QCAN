@@ -18,15 +18,10 @@ extern "C" {
 #endif
 
 #include <stdbool.h>
-#include <stdint.h>
-
 #include "usbd_def.h"
-
-#include "usbd_composite.h"
 
 extern USBD_ClassTypeDef USBD_GS_CAN;
 
-uint8_t USBD_GS_CAN_Init_(USBD_COMPOSITE_HandleTypeDef *hcan, USBD_HandleTypeDef *pdev);
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev);
 void USBD_GS_CAN_ResumeCallback(USBD_HandleTypeDef *pdev);
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
@@ -35,9 +30,6 @@ bool USBD_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
 bool USBD_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 
 bool USBD_GS_CAN_DfuDetachRequested(USBD_HandleTypeDef *pdev);
-
-void usbd_gs_can_purge_from_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan, struct can_channel *channel);
-void usbd_gs_can_purge_to_host_list_by_channel(USBD_COMPOSITE_HandleTypeDef *hcan, const struct can_channel *channel);
 
 #ifdef __cplusplus
 };
