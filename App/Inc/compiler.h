@@ -91,11 +91,17 @@
 #define struct_size(ptr, field, num) \
 		(offsetof(__typeof(*(ptr)), field) + sizeof((ptr)->field[0]) * (num))
 
+#ifdef __cplusplus
+/* sizeof(struct{}) is 1 in C++, not 0, can't use C version of the macro. */
+#define DECLARE_FLEX_ARRAY(_t, _n)	\
+	_t _n[0]
+#else
 #define DECLARE_FLEX_ARRAY(_t, _n) \
 		struct { \
 			struct { } __dummy_ ## _n; \
 			_t _n[0]; \
 		}
+#endif
 
 #ifndef __struct_group
 #define __struct_group(_tag, _name, _attrs, _members ...) \

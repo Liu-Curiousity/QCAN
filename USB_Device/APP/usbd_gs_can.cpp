@@ -6,6 +6,7 @@
 #include "can_common.h"
 #include "gpio_.h"
 #include "timer.h"
+#include "led.h"
 
 extern USBD_GS_CAN_HandleTypeDef hGS_CAN;
 
@@ -304,9 +305,9 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 		}
 		case GS_USB_BREQ_IDENTIFY: {
 			if (ep0->data.identify_mode.mode) {
-				led_set_mode(&channel->leds, LED_MODE_SEQUENCE);
+				led.mode = signal_led::Mode::CONTINUES;
 			} else {
-				led_set_mode(&channel->leds, can_is_enabled(channel) ? LED_MODE_NORMAL : LED_MODE_OFF);
+				led.mode = can_is_enabled(channel) ? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
 			}
 			break;
 		}
@@ -315,7 +316,7 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			break;
 		}
 		case GS_USB_BREQ_SET_TERMINATION: {
-			set_term(channel, ep0->data.term_state.state);
+			set_term(channel, (gs_can_termination_state)ep0->data.term_state.state);
 			break;
 		}
 		default:
@@ -341,6 +342,18 @@ static uint8_t USBD_GS_CAN_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
     return USBD_OK;
 }
 
+static uint8_t out_prepare_receive(USBD_HandleTypeDef *pdev) {
+	// We can not unconditionally re-enable RX if the pre-allocated
+	// buffers are not fully ready.
+	for (unsigned i = 0; i < ARRAY_SIZE(hGS_CAN.from_host_buf); ++i) {
+		if (!hGS_CAN.from_host_buf[i])
+			return USBD_OK;
+	}
+	USBD_GS_CAN_PrepareReceive(pdev);
+
+	return USBD_OK;
+}
+
 // Note that the return value is completely ignored by the stack.
 static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	if (epnum != GSUSB_ENDPOINT_OUT) return USBD_OK;
@@ -355,18 +368,18 @@ static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 	if (rxlen < (struct_size(&hGS_CAN.from_host_buf[0]->frame, classic_can, 1))) {
 		// Invalid frame length, just ignore it and receive into the same buffer
 		// again next time.
-		goto out_prepare_receive;
+		return out_prepare_receive(pdev);
 	}
 
 	channel = USBD_GS_CAN_GetChannel(&hGS_CAN, hGS_CAN.from_host_buf[0]->frame.channel);
 	if (!channel) {
-		goto out_prepare_receive;
+		return out_prepare_receive(pdev);
 	}
 
 	if (IS_ENABLED(CONFIG_CANFD) &&
 		hGS_CAN.from_host_buf[0]->frame.flags & GS_CAN_FLAG_FD &&
 		rxlen < struct_size(&hGS_CAN.from_host_buf[0]->frame, canfd, 1)) {
-		goto out_prepare_receive;
+		return out_prepare_receive(pdev);
 	}
 
 	bool was_irq_enabled = disable_irq();
@@ -400,17 +413,6 @@ static uint8_t USBD_GS_CAN_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
 							 USB_EP_RX_NAK);
 #endif
 	}
-	return USBD_OK;
-
-out_prepare_receive:
-	// We can not unconditionally re-enable RX if the pre-allocated
-	// buffers are not fully ready.
-	for (unsigned i = 0; i < ARRAY_SIZE(hGS_CAN.from_host_buf); ++i) {
-		if (!hGS_CAN.from_host_buf[i])
-			return USBD_OK;
-	}
-	USBD_GS_CAN_PrepareReceive(pdev);
-
 	return USBD_OK;
 }
 

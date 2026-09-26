@@ -30,7 +30,7 @@
 
 #include "config.h"
 #include "gs_usb.h"
-#include "led.h"
+#include "main.h"
 #define new new_
 #include "list.h"
 #undef new
@@ -58,7 +58,6 @@ typedef struct can_channel {
 #endif
 	struct can_drv_reg_status reg_status;
 	struct list_head list_from_host;		// 待发送到CAN总线的帧队列
-	led_data_t leds;
 	uint32_t feature;
 	enum gs_can_state state;
 	uint32_t bus_off_restart;

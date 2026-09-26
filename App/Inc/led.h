@@ -2,7 +2,6 @@
 
 #include <gpio.h>
 
-#ifdef __cplusplus
 class led {
 public:
     led(const GPIO_TypeDef *port, const uint16_t pin, const bool is_active_high) :
@@ -111,31 +110,7 @@ private:
     blink_led leds[LED_MAX];
 };
 
-extern signal_led led;
-
-extern "C" {
-#endif
-
-#include <stdint.h>
-
-typedef enum {
-    LED_MODE_OFF,
-    LED_MODE_NORMAL,
-    LED_MODE_SEQUENCE
-} led_mode_t;
-
-typedef enum {
-    LED_RX = 0, //will also index into array led_state[]
-    LED_TX,
-    LED_MAX
-} led_num_t;
-
-typedef struct {
-} led_data_t;
-
-void led_set_mode(led_data_t *leds, led_mode_t mode);
-void led_indicate_trx(led_data_t *leds, led_num_t num);
-
-#ifdef __cplusplus
-}
-#endif
+inline signal_led led{
+    {LED_RX_GPIO_Port, LED_RX_Pin, true},
+    {LED_TX_GPIO_Port, LED_TX_Pin, true}
+};

@@ -84,14 +84,14 @@ void can_drv_enable(struct can_channel *channel)
 	}
 
 	CAN_FilterTypeDef filter_config = {
-		.FilterBank = 0,
-		.FilterMode = CAN_FILTERMODE_IDMASK,
-		.FilterScale = CAN_FILTERSCALE_32BIT,
 		.FilterIdHigh = 0x0000,
 		.FilterIdLow = 0x0000,
 		.FilterMaskIdHigh = 0x0000,
 		.FilterMaskIdLow = 0x0000,
 		.FilterFIFOAssignment = CAN_RX_FIFO0,
+		.FilterBank = 0,
+		.FilterMode = CAN_FILTERMODE_IDMASK,
+		.FilterScale = CAN_FILTERSCALE_32BIT,
 		.FilterActivation = ENABLE,
 	};
 	if (HAL_CAN_ConfigFilter(hcan, &filter_config) != HAL_OK) {

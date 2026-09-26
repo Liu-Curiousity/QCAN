@@ -35,7 +35,7 @@
 #define CAN_BUS_OFF_RESTART_DELAY_MS 100
 
 #ifndef CONFIG_CANFD
-const struct gs_device_bt_const_extended CAN_btconst_ext;
+const struct gs_device_bt_const_extended CAN_btconst_ext{};
 #endif
 
 static inline struct gs_host_frame_object* gs_host_frame_object_get_locked(USBD_GS_CAN_HandleTypeDef *hcan) {
@@ -88,7 +88,7 @@ bool can_is_enabled(const struct can_channel *channel)
 }
 
 bool can_enable(struct can_channel *channel, const uint32_t feature) {
-	led_set_mode(&channel->leds, LED_MODE_NORMAL);
+	led.mode = signal_led::Mode::NORMAL;
 
 	channel->feature = feature;
 	channel->state = GS_CAN_STATE_ERROR_ACTIVE;
@@ -141,7 +141,7 @@ void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel) {
 	channel->state = GS_CAN_STATE_STOPPED;
 	channel->feature = 0;
 
-	led_set_mode(&channel->leds, LED_MODE_OFF);
+	led.mode = signal_led::Mode::OFF;
 }
 
 void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
@@ -173,7 +173,7 @@ void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
 
 	list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
 
-	led_indicate_trx(&channel->leds, LED_TX);
+	led.blink_request(signal_led::LED_TX);
 }
 
 void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
@@ -196,7 +196,7 @@ void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
 
 	list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
 
-	led_indicate_trx(&channel->leds, LED_RX);
+	led.blink_request(signal_led::LED_RX);
 }
 
 void can_get_device_state(const struct can_channel *channel, struct gs_device_state *state) {

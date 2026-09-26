@@ -1,6 +1,7 @@
 #include "can.h"
 #include "usbd_composite.h"
 #include "can_common.h"
+#include "led.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
 #include "usbd_gs_can.h"
