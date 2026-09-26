@@ -74,8 +74,6 @@ union ep0 {
 typedef struct {
     union ep0 ep0;
 
-    void *pClassData[3];
-
     USBD_SetupReqTypedef last_setup_request;
 
     struct list_head list_frame_pool; // 共享空闲队列

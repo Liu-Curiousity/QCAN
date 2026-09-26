@@ -4,7 +4,6 @@
 #include <usbd_core.h>
 
 #include "can_common.h"
-#include "gpio_.h"
 #include "timer.h"
 #include "led.h"
 
@@ -193,7 +192,8 @@ static uint8_t USBD_GS_CAN_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef 
 			len = sizeof(ep0->data.term_state);
 			break;
 		case GS_USB_BREQ_GET_TERMINATION:
-			ep0->data.term_state.state = get_term(channel);
+			// TODO: 后续支持
+			ep0->data.term_state.state = GS_CAN_TERMINATION_UNSUPPORTED;
 			src = &ep0->data.term_state;
 			len = sizeof(ep0->data.term_state);
 			break;
@@ -316,7 +316,8 @@ static uint8_t USBD_GS_CAN_EP0_RxReady(USBD_HandleTypeDef *pdev) {
 			break;
 		}
 		case GS_USB_BREQ_SET_TERMINATION: {
-			set_term(channel, (gs_can_termination_state)ep0->data.term_state.state);
+			// TODO: 后续支持
+			// set_term(channel, (gs_can_termination_state)ep0->data.term_state.state);
 			break;
 		}
 		default:
