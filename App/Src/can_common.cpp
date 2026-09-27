@@ -28,12 +28,6 @@
 #include "led.h"
 #include "timer.h"
 
-#define CAN_ERROR_WARNING_THRESHOLD	 96
-#define CAN_ERROR_PASSIVE_THRESHOLD	 128
-#define CAN_BUS_OFF_THRESHOLD		 256
-
-#define CAN_BUS_OFF_RESTART_DELAY_MS 100
-
 #ifndef CONFIG_CANFD
 const struct gs_device_bt_const_extended CAN_btconst_ext{};
 #endif
