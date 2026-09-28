@@ -121,8 +121,10 @@
 		__struct_group(_tag, _name, /* no attrs */, _members)
 #endif
 
+#ifndef __cplusplus
 #define min(x, y) ((x) < (y) ? (x) : (y))
 #define max(x, y) ((x) > (y) ? (x) : (y))
+#endif
 
 /*
  * BUILD_BUG_ON() can happen inside functions where _Static_assert() does not
@@ -146,8 +148,10 @@
 #define BUILD_BUG_ON_INVALID(expr)	   while (0) { (void)(expr); }
 #define BUILD_BUG_ON_ZERO(x)		   ((int)sizeof(struct { int: -((x) != 0); }))
 
+#ifndef __cplusplus
 #undef static_assert
 #define static_assert(x, ...)		 __static_assert(x, ## __VA_ARGS__, #x)
 #define __static_assert(x, msg, ...) _Static_assert(x, msg)
+#endif
 
 #endif /* _LINUXKPI_LINUX_COMPILER_H_ */

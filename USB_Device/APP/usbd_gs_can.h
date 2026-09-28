@@ -13,7 +13,6 @@
 #ifndef QCAN_USBD_GS_USB_H
 #define QCAN_USBD_GS_USB_H
 
-#include <stdbool.h>
 #include "usbd_def.h"
 #include "bxcan.h"
 
@@ -39,37 +38,18 @@
 #define USBD_GS_CAN_RX_BUFFER_COUNT 1
 #endif
 
+#ifdef __cplusplus
+
+#include <algorithm>
+
 struct gs_host_frame_object {
-    struct list_head list;
+    list_head list;
 
     union {
         uint8_t _buf[GS_HOST_FRAME_SIZE];
-        struct gs_host_frame frame;
+        gs_host_frame frame;
     };
 };
-
-union ep0 {
-    union ep0_data {
-        // Device -> Host
-        struct gs_device_state state;
-
-        // Host -> Device
-        struct gs_host_config config;
-        struct gs_device_bittiming bittiming;
-        struct gs_device_mode mode;
-        struct gs_identify_mode identify_mode;
-
-        // Device <-> Host
-        struct gs_device_termination_state term_state;
-    } data;
-
-    uint8_t __aligned(4) buf[sizeof(union ep0_data)];
-};
-
-
-#ifdef __cplusplus
-
-#include "initializer_list"
 
 class USBD_GS_CAN_HandleTypeDef {
 public:
@@ -92,7 +72,28 @@ public:
         }
     }
 
-    union ep0 ep0{};
+    union ep0 {
+        // Device -> Host
+        gs_device_state state;
+
+        // Host -> Device
+        gs_host_config config;
+        gs_device_bittiming bittiming;
+        gs_device_mode mode;
+        gs_identify_mode identify_mode;
+
+        // Device <-> Host
+        gs_device_termination_state term_state;
+
+        alignas(4) uint8_t buf[std::max({
+            sizeof(gs_device_state),
+            sizeof(gs_host_config),
+            sizeof(gs_device_bittiming),
+            sizeof(gs_device_mode),
+            sizeof(gs_identify_mode),
+            sizeof(gs_device_termination_state)
+        })];
+    } ep0{};
 
     USBD_SetupReqTypedef last_setup_request{};
 
@@ -108,7 +109,7 @@ public:
     uint32_t sof_timestamp_us;
     volatile bool is_usb_suspend_cb{};
 
-    can_data_t* GetChannel(const uint16_t ch) const {
+    [[nodiscard]] can_data_t* GetChannel(const uint16_t ch) const {
         return ch < channel_count ? &channels[ch] : nullptr;
     }
 
