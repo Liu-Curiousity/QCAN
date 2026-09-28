@@ -29,7 +29,6 @@
 #include <stdint.h>
 
 #include "bxcan.h"
-#include "usbd_gs_can.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,22 +46,37 @@ extern "C" {
 #ifdef __cplusplus
 }
 
-bool can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
-bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
+#ifdef CONFIG_CANFD
+#define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, canfd_ts, 1)
+#else
+#define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, classic_can_ts, 1)
+#endif
 
-bool can_is_enabled(const struct can_channel *channel);
-bool can_enable(struct can_channel *channel, uint32_t feature);
-void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel);
-void can_get_device_state(const struct can_channel *channel, struct gs_device_state *state);
+struct gs_host_frame_object {
+    list_head list;
 
-enum gs_can_state can_err_to_state(const uint16_t err);
-uint8_t gs_can_tx_state_to_frame(const enum gs_can_state state);
-uint8_t gs_can_rx_state_to_frame(const enum gs_can_state state);
-void can_lec_error_to_frame(struct gs_host_frame *frame, const uint8_t lec);
+    union {
+        uint8_t _buf[GS_HOST_FRAME_SIZE];
+        gs_host_frame frame;
+    };
+};
 
-void can_schedule_bus_off_recovery(struct can_channel *channel, uint32_t delay_ms);
+bool can_set_bittiming(can_channel *channel, const gs_device_bittiming *timing);
+bool can_set_data_bittiming(can_channel *channel, const gs_device_bittiming *timing);
 
-void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
-void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
-void CAN_HandleError(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
+bool can_is_enabled(const can_channel *channel);
+bool can_enable(can_channel *channel, uint32_t feature);
+void can_disable(list_head *plist_to_host, list_head *plist_frame_pool, can_channel *channel);
+void can_get_device_state(const can_channel *channel, gs_device_state *state);
+
+gs_can_state can_err_to_state(uint16_t err);
+uint8_t gs_can_tx_state_to_frame(const gs_can_state state);
+uint8_t gs_can_rx_state_to_frame(const gs_can_state state);
+void can_lec_error_to_frame(gs_host_frame *frame, uint8_t lec);
+
+void can_schedule_bus_off_recovery(can_channel *channel, uint32_t delay_ms);
+
+void CAN_SendFrame(list_head *plist_to_host, can_data_t *channel);
+void CAN_ReceiveFrame(list_head *plist_to_host, list_head *plist_frame_pool, can_data_t *channel);
+void CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool, can_data_t *channel);
 #endif

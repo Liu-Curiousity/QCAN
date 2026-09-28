@@ -23,12 +23,6 @@
 #define CAN_DATA_MAX_PACKET_SIZE 32    /* Endpoint IN & OUT Packet size */
 #endif
 
-#ifdef CONFIG_CANFD
-#define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, canfd_ts, 1)
-#else
-#define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, classic_can_ts, 1)
-#endif
-
 // When using double buffer for RX, this needs to be at least 2 to
 // ensure there is always an RX buffer ready to receive the
 // RX frames.
@@ -41,15 +35,7 @@
 #ifdef __cplusplus
 
 #include <algorithm>
-
-struct gs_host_frame_object {
-    list_head list;
-
-    union {
-        uint8_t _buf[GS_HOST_FRAME_SIZE];
-        gs_host_frame frame;
-    };
-};
+#include "can_common.h"
 
 class USBD_GS_CAN_HandleTypeDef {
 public:
@@ -68,7 +54,8 @@ public:
             this->channels[i].nr = i;
             INIT_LIST_HEAD(&this->channels[i].list_from_host);
             // this->channels[i].disable();
-            // can_disable(&hGS_CAN, channel);
+            // TODO: 不能在此处disable,可能在CAN外设初始化之前运行
+            // can_disable(&list_to_host, &list_frame_pool, &this->channels[i]);
         }
     }
 

@@ -38,11 +38,10 @@
 const struct gs_device_bt_const_extended CAN_btconst_ext{};
 #endif
 
-static inline struct gs_host_frame_object* gs_host_frame_object_get_locked(USBD_GS_CAN_HandleTypeDef *hcan) {
-	bool was_irq_enabled = disable_irq();
-	struct gs_host_frame_object *frame_object = list_first_entry_or_null(&hcan->list_frame_pool,
-																		 struct gs_host_frame_object,
-																		 list);
+static gs_host_frame_object* gs_host_frame_object_get_locked(list_head *plist) {
+	const bool was_irq_enabled = disable_irq();
+	gs_host_frame_object *frame_object =
+		list_first_entry_or_null(plist, struct gs_host_frame_object, list);
 
 	if (frame_object) list_del(&frame_object->list);
 
@@ -51,7 +50,7 @@ static inline struct gs_host_frame_object* gs_host_frame_object_get_locked(USBD_
 }
 
 static bool can_check_bittiming_ok(const struct can_bittiming_const *btc,
-							const struct gs_device_bittiming *timing)
+                                   const struct gs_device_bittiming *timing)
 {
 	const uint32_t tseg1 = timing->prop_seg + timing->phase_seg1;
 
@@ -87,7 +86,7 @@ bool can_is_enabled(const struct can_channel *channel)
 	return channel->state < GS_CAN_STATE_STOPPED;
 }
 
-bool can_enable(struct can_channel *channel, const uint32_t feature) {
+bool can_enable(can_channel *channel, const uint32_t feature) {
 	led.mode = signal_led::Mode::NORMAL;
 
 	channel->feature = feature;
@@ -97,21 +96,17 @@ bool can_enable(struct can_channel *channel, const uint32_t feature) {
 	return true;
 }
 
-void usbd_gs_can_purge_from_host_list_by_channel(USBD_GS_CAN_HandleTypeDef *hcan,
-												 struct can_channel *channel)
-{
-	list_splice_tail_init_locked(&channel->list_from_host, &hcan->list_frame_pool);
+static void usbd_gs_can_purge_from_host_list_by_channel(list_head *plist, can_channel *channel) {
+	list_splice_tail_init_locked(&channel->list_from_host, plist);
 }
 
-void usbd_gs_can_purge_to_host_list_by_channel(USBD_GS_CAN_HandleTypeDef *hcan,
-											   const struct can_channel *channel)
-{
+static void usbd_gs_can_purge_to_host_list_by_channel(list_head *plist_to_host,list_head *plist_frame_pool, const can_channel *channel) {
 	/*
 	 * If we only have one channel, all object of hcan->list_to_host belong to this one channel.
 	 * Move the complete list to the frame pool.
 	 */
 	if (NUM_CAN_CHANNEL == 1) {
-		list_splice_tail_init_locked(&hcan->list_to_host, &hcan->list_frame_pool);
+		list_splice_tail_init_locked(plist_to_host, plist_frame_pool);
 
 		return;
 	}
@@ -119,23 +114,23 @@ void usbd_gs_can_purge_to_host_list_by_channel(USBD_GS_CAN_HandleTypeDef *hcan,
 	/*
 	 * For more than one channel, iterate over each object in hcan->list_to_host.
 	 */
-	struct gs_host_frame_object *iter, *next;
+	gs_host_frame_object *iter, *next;
 	const bool was_irq_enabled = disable_irq();
 
-	list_for_each_entry_safe(iter, next, &hcan->list_to_host, list) {
+	list_for_each_entry_safe(iter, next, plist_to_host, list) {
 		if (iter->frame.channel == channel->nr) {
-			list_move_tail(&iter->list, &hcan->list_frame_pool);
+			list_move_tail(&iter->list, plist_frame_pool);
 		}
 	}
 
 	restore_irq(was_irq_enabled);
 }
 
-void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel) {
+void can_disable(list_head *plist_to_host,list_head *plist_frame_pool, can_channel *channel) {
 	can_drv_disable(channel);
 
-	usbd_gs_can_purge_from_host_list_by_channel(hcan, channel);
-	usbd_gs_can_purge_to_host_list_by_channel(hcan, channel);
+	usbd_gs_can_purge_from_host_list_by_channel(plist_frame_pool, channel);
+	usbd_gs_can_purge_to_host_list_by_channel(plist_to_host, plist_frame_pool, channel);
 
 	channel->bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
 	channel->state = GS_CAN_STATE_STOPPED;
@@ -144,9 +139,9 @@ void can_disable(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel) {
 	led.mode = signal_led::Mode::OFF;
 }
 
-void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
-	bool was_irq_enabled = disable_irq();
-	struct gs_host_frame_object *frame_object =
+void CAN_SendFrame(list_head *plist_to_host, can_data_t *channel) {
+	const bool was_irq_enabled = disable_irq();
+	gs_host_frame_object *frame_object =
 		list_first_entry_or_null(&channel->list_from_host, struct gs_host_frame_object, list);
 
 	if (!frame_object) {
@@ -157,7 +152,7 @@ void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
 	list_del(&frame_object->list);
 	restore_irq(was_irq_enabled);
 
-	struct gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object->frame;
 
 	if (!can_send(channel, frame)) {
 		list_add_locked(&frame_object->list, &channel->list_from_host);
@@ -171,35 +166,35 @@ void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
 	else
 		frame->classic_can_ts->timestamp_us = timer_get();
 
-	list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
+	list_add_tail_locked(&frame_object->list, plist_to_host);
 
 	led.blink_request(signal_led::LED_TX);
 }
 
-void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
-	struct gs_host_frame_object *frame_object;
+void CAN_ReceiveFrame(list_head *plist_to_host,list_head *plist_frame_pool, can_data_t *channel) {
+	gs_host_frame_object *frame_object;
 
 	if (!can_is_rx_pending(channel)) return;
 
-	frame_object = gs_host_frame_object_get_locked(hcan);
+	frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
 	if (!frame_object) return;
 
-	struct gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object->frame;
 
 	if (!can_receive(channel, frame)) {
-		list_add_tail_locked(&frame_object->list, &hcan->list_frame_pool);
+		list_add_tail_locked(&frame_object->list, plist_frame_pool);
 		return;
 	}
 
 	frame->echo_id = GS_HOST_FRAME_ECHO_ID_RX; // not an echo frame
 	frame->reserved = 0;
 
-	list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
+	list_add_tail_locked(&frame_object->list, plist_to_host);
 
 	led.blink_request(signal_led::LED_RX);
 }
 
-void can_get_device_state(const struct can_channel *channel, struct gs_device_state *state) {
+void can_get_device_state(const can_channel *channel, gs_device_state *state) {
 	const uint32_t reg_esr = channel->reg_status.esr;
 
 	state->state = can_drv_get_state(channel);
@@ -207,19 +202,19 @@ void can_get_device_state(const struct can_channel *channel, struct gs_device_st
 	state->txerr = FIELD_GET(CAN_ESR_TEC, reg_esr);
 }
 
-static void can_prepare_error_frame(const struct can_channel *channel, struct gs_host_frame *frame) {
+static void can_prepare_error_frame(const can_channel *channel, gs_host_frame *frame) {
 	frame->echo_id = GS_HOST_FRAME_ECHO_ID_RX;
 	frame->can_id = CAN_ERR_FLAG;
 	frame->can_dlc = CAN_ERR_DLC;
 	frame->channel = channel->nr;
 	frame->flags = 0;
 	frame->reserved = 0;
-	*frame->classic_can = (struct classic_can){0};
+	*frame->classic_can = classic_can{0};
 
 	frame->classic_can_ts->timestamp_us = timer_get();
 }
 
-enum gs_can_state can_err_to_state(const uint16_t err) {
+gs_can_state can_err_to_state(const uint16_t err) {
 	if (err < CAN_ERROR_WARNING_THRESHOLD)
 		return GS_CAN_STATE_ERROR_ACTIVE;
 	if (err < CAN_ERROR_PASSIVE_THRESHOLD)
@@ -230,7 +225,7 @@ enum gs_can_state can_err_to_state(const uint16_t err) {
 	return GS_CAN_STATE_BUS_OFF;
 }
 
-uint8_t gs_can_tx_state_to_frame(const enum gs_can_state state) {
+uint8_t gs_can_tx_state_to_frame(const gs_can_state state) {
 	switch (state) {
 		case GS_CAN_STATE_ERROR_ACTIVE:
 			return CAN_ERR_CRTL_ACTIVE;
@@ -243,7 +238,7 @@ uint8_t gs_can_tx_state_to_frame(const enum gs_can_state state) {
 	}
 }
 
-uint8_t gs_can_rx_state_to_frame(const enum gs_can_state state) {
+uint8_t gs_can_rx_state_to_frame(const gs_can_state state) {
 	switch (state) {
 		case GS_CAN_STATE_ERROR_ACTIVE:
 			return CAN_ERR_CRTL_ACTIVE;
@@ -256,7 +251,7 @@ uint8_t gs_can_rx_state_to_frame(const enum gs_can_state state) {
 	}
 }
 
-void can_lec_error_to_frame(struct gs_host_frame *frame, const uint8_t lec) {
+void can_lec_error_to_frame(gs_host_frame *frame, const uint8_t lec) {
 	switch (lec) {
 		case CAN_LEC_STUFF_ERROR:
 			frame->classic_can->data[2] |= CAN_ERR_PROT_STUFF;
@@ -281,40 +276,40 @@ void can_lec_error_to_frame(struct gs_host_frame *frame, const uint8_t lec) {
 	}
 }
 
-static void can_handle_bus_error(USBD_GS_CAN_HandleTypeDef *hcan, const struct can_channel *channel) {
-	struct gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(hcan);
+static void can_handle_bus_error(list_head *plist_to_host, list_head *plist_frame_pool, const can_channel *channel) {
+	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
 	if (!frame_object) return;
 
-	struct gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object->frame;
 
 	can_prepare_error_frame(channel, frame);
 	bool handled = can_drv_handle_bus_error(channel, frame);
 	if (handled) {
-		list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
+		list_add_tail_locked(&frame_object->list, plist_to_host);
 	} else {
-		list_add_locked(&frame_object->list, &hcan->list_frame_pool);
+		list_add_locked(&frame_object->list, plist_frame_pool);
 	}
 }
 
-static bool can_bus_error_pending(const struct can_channel *channel) {
+static bool can_bus_error_pending(const can_channel *channel) {
 	if (!(channel->feature & GS_CAN_FEATURE_BERR_REPORTING))
 		return false;
 
 	return can_drv_bus_error_pending(channel);
 }
 
-void can_schedule_bus_off_recovery(struct can_channel *channel, const uint32_t delay_ms) {
+void can_schedule_bus_off_recovery(can_channel *channel, const uint32_t delay_ms) {
 	channel->bus_off_restart = HAL_GetTick() + delay_ms;
 
 	if (channel->bus_off_restart == CAN_CHANNEL_BUS_OFF_RESTART_DISABLED)
 		channel->bus_off_restart++;
 }
 
-static void can_handle_state_change(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel) {
-	struct gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(hcan);
+static void can_handle_state_change(list_head *plist_to_host, list_head *plist_frame_pool, can_channel *channel) {
+	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
 	if (!frame_object) return;
 
-	struct gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object->frame;
 	can_prepare_error_frame(channel, frame);
 
 	if (channel->state == GS_CAN_STATE_BUS_OFF) {
@@ -328,13 +323,13 @@ static void can_handle_state_change(USBD_GS_CAN_HandleTypeDef *hcan, struct can_
 		can_drv_handle_bus_error(channel, frame);
 	}
 
-	list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
+	list_add_tail_locked(&frame_object->list, plist_to_host);
 }
 
-static bool can_state_change_pending(struct can_channel *channel) {
+static bool can_state_change_pending(can_channel *channel) {
 	if (!can_is_enabled(channel)) return false;
 
-	const enum gs_can_state new_state = can_drv_get_state(channel);
+	const gs_can_state new_state = can_drv_get_state(channel);
 	if (channel->state == new_state) return false;
 
 	channel->state = new_state;
@@ -342,24 +337,24 @@ static bool can_state_change_pending(struct can_channel *channel) {
 	return true;
 }
 
-static void can_handle_bus_off_recovery(USBD_GS_CAN_HandleTypeDef *hcan, struct can_channel *channel) {
+static void can_handle_bus_off_recovery(list_head *plist_to_host, list_head *plist_frame_pool, can_channel *channel) {
 	can_drv_handle_bus_off_recovery(channel);
 
 	channel->bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
 
-	struct gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(hcan);
+	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
 	if (!frame_object)
 		return;
 
-	struct gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object->frame;
 	can_prepare_error_frame(channel, frame);
 
 	frame->can_id |= CAN_ERR_RESTARTED;
 
-	list_add_tail_locked(&frame_object->list, &hcan->list_to_host);
+	list_add_tail_locked(&frame_object->list, plist_to_host);
 }
 
-static bool can_bus_off_recovery_pending(const struct can_channel *channel) {
+static bool can_bus_off_recovery_pending(const can_channel *channel) {
 	if (channel->bus_off_restart == CAN_CHANNEL_BUS_OFF_RESTART_DISABLED)
 		return false;
 
@@ -372,16 +367,16 @@ static bool can_bus_off_recovery_pending(const struct can_channel *channel) {
 // best we can localize the errors to is "after the last successfully
 // received frame", so wait until we get there. LEC will hold some error
 // to report even if multiple pass by.
-void CAN_HandleError(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel) {
+void CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool, can_data_t *channel) {
 	if (can_is_rx_pending(channel)) return;
 
 	can_drv_read_reg_status(channel);
 
 	if (can_state_change_pending(channel)) {
-		can_handle_state_change(hcan, channel);
+		can_handle_state_change(plist_to_host, plist_frame_pool, channel);
 	} else if (can_bus_error_pending(channel)) {
-		can_handle_bus_error(hcan, channel);
+		can_handle_bus_error(plist_to_host, plist_frame_pool, channel);
 	} else if (can_bus_off_recovery_pending(channel)) {
-		can_handle_bus_off_recovery(hcan, channel);
+		can_handle_bus_off_recovery(plist_to_host, plist_frame_pool, channel);
 	}
 }

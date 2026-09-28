@@ -247,7 +247,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
             const gs_device_mode *mode = &ep0.mode;
 
             if (mode->mode == GS_CAN_MODE_RESET) {
-                can_disable(&hGS_CAN, channel);
+                can_disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, channel);
             } else if (mode->mode == GS_CAN_MODE_START) {
                 if (!can_enable(channel, mode->feature)) goto out_fail;
             }
@@ -497,7 +497,7 @@ void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev) {
     for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
         can_data_t *channel = &hGS_CAN.channels[i];
 
-        can_disable(&hGS_CAN, channel);
+        can_disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, channel);
     }
 
     hGS_CAN.is_usb_suspend_cb = true;

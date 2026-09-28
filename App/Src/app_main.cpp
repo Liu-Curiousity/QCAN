@@ -13,7 +13,7 @@ static USBD_HandleTypeDef hUSB;
 
 extern "C" void app_main() {
     for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-        can_disable(&hGS_CAN, &hGS_CAN.channels[i]);
+        can_disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, &hGS_CAN.channels[i]);
     }
 
     USBD_Init(&hUSB, &FS_Desc, DEVICE_FS);
@@ -24,7 +24,7 @@ extern "C" void app_main() {
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
             can_data_t *channel = &hGS_CAN.channels[i];
 
-            CAN_SendFrame(&hGS_CAN, channel);
+            CAN_SendFrame(&hGS_CAN.list_to_host, channel);
         }
 
         USBD_GS_CAN_ReceiveFromHost(&hUSB);
@@ -33,8 +33,8 @@ extern "C" void app_main() {
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
             can_data_t *channel = &hGS_CAN.channels[i];
 
-            CAN_ReceiveFrame(&hGS_CAN, channel);
-            CAN_HandleError(&hGS_CAN, channel);
+            CAN_ReceiveFrame(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, channel);
+            CAN_HandleError(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, channel);
 
             led.update();
         }
