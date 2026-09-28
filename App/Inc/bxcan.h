@@ -25,13 +25,9 @@
 
 #pragma once
 
-#include <stdint.h>
-#include <stdbool.h>
-
 #include "config.h"
 #include "gs_usb.h"
 #include "main.h"
-// #include "led.h"
 #define new new_
 #include "list.h"
 #undef new
@@ -49,47 +45,92 @@ struct can_drv_reg_status {
 #endif
 };
 
-#define CAN_CHANNEL_BUS_OFF_RESTART_DISABLED 0
-
-typedef struct can_channel {
-#if defined (CONFIG_BXCAN)
-	CAN_HandleTypeDef *hcan;
-#elif defined(CONFIG_M_CAN)
-	FDCAN_HandleTypeDef *hfdcan;
-#endif
-	struct can_drv_reg_status reg_status;
-	struct list_head list_from_host;		// 待发送到CAN总线的帧队列
-	uint32_t feature;
-	enum gs_can_state state;
-	uint32_t bus_off_restart;
-	struct gs_device_bittiming bittiming;
-#ifdef CONFIG_CANFD
-	struct gs_device_bittiming data_bittiming;
-#endif
-	uint8_t nr;
-} can_data_t;
-
-extern const struct gs_device_bt_const CAN_btconst;
-extern const struct gs_device_bt_const_extended CAN_btconst_ext;
-
-bool can_receive(can_data_t *channel, struct gs_host_frame *rx_frame);
-bool can_is_rx_pending(can_data_t *channel);
-
-bool can_send(can_data_t *channel, struct gs_host_frame *frame);
-
-void can_drv_enable(struct can_channel *channel);
-void can_drv_disable(struct can_channel *channel);
-
-void can_drv_read_reg_status(struct can_channel *channel);
-
-bool can_drv_bus_error_pending(const struct can_channel *channel);
-bool can_drv_handle_bus_error(const struct can_channel *channel, struct gs_host_frame *frame);
-
-enum gs_can_state can_drv_get_state(const struct can_channel *channel);
-void can_drv_handle_state_change(const struct can_channel *channel, struct gs_host_frame *frame);
-
-void can_drv_handle_bus_off_recovery(struct can_channel *channel);
-
 #ifdef __cplusplus
 }
+#include "can_common.h"
+class bxcan_ : public CAN_Channel {
+public:
+	bxcan_(CAN_HandleTypeDef *hcan, const uint8_t nr) : CAN_Channel(nr), hcan(hcan) {}
+
+	gs_can_state err_to_state(const uint16_t err) {
+        if (err < CAN_ERROR_WARNING_THRESHOLD)
+            return GS_CAN_STATE_ERROR_ACTIVE;
+        if (err < CAN_ERROR_PASSIVE_THRESHOLD)
+            return GS_CAN_STATE_ERROR_WARNING;
+        if (err < CAN_BUS_OFF_THRESHOLD)
+            return GS_CAN_STATE_ERROR_PASSIVE;
+
+        return GS_CAN_STATE_BUS_OFF;
+    }
+
+    uint8_t gs_can_tx_state_to_frame(const gs_can_state state) {
+        switch (state) {
+            case GS_CAN_STATE_ERROR_ACTIVE:
+                return CAN_ERR_CRTL_ACTIVE;
+            case GS_CAN_STATE_ERROR_WARNING:
+                return CAN_ERR_CRTL_TX_WARNING;
+            case GS_CAN_STATE_ERROR_PASSIVE:
+                return CAN_ERR_CRTL_TX_PASSIVE;
+            default:
+                return 0;
+        }
+    }
+
+    uint8_t gs_can_rx_state_to_frame(const gs_can_state state) {
+        switch (state) {
+            case GS_CAN_STATE_ERROR_ACTIVE:
+                return CAN_ERR_CRTL_ACTIVE;
+            case GS_CAN_STATE_ERROR_WARNING:
+                return CAN_ERR_CRTL_RX_WARNING;
+            case GS_CAN_STATE_ERROR_PASSIVE:
+                return CAN_ERR_CRTL_RX_PASSIVE;
+            default:
+                return 0;
+        }
+    }
+
+    void can_lec_error_to_frame(gs_host_frame *frame, const uint8_t lec) {
+	    switch (lec) {
+	        case CAN_LEC_STUFF_ERROR:
+	            frame->classic_can->data[2] |= CAN_ERR_PROT_STUFF;
+	            break;
+	        case CAN_LEC_FORM_ERROR:
+	            frame->classic_can->data[2] |= CAN_ERR_PROT_FORM;
+	            break;
+	        case CAN_LEC_ACK_ERROR:
+	            frame->can_id |= CAN_ERR_ACK;
+	            break;
+	        case CAN_LEC_REC_ERROR:
+	            frame->classic_can->data[2] |= CAN_ERR_PROT_BIT1;
+	            break;
+	        case CAN_LEC_DOM_ERROR:
+	            frame->classic_can->data[2] |= CAN_ERR_PROT_BIT0;
+	            break;
+	        case CAN_LEC_CRC_ERROR:
+	            frame->classic_can->data[3] |= CAN_ERR_PROT_LOC_CRC_SEQ;
+	            break;
+	        default:
+	            break;
+	    }
+	}
+
+	void can_drv_read_reg_status();
+
+	bool can_drv_bus_error_pending();
+
+private:
+	CAN_HandleTypeDef *hcan;
+	can_drv_reg_status reg_status{};
+
+	void drv_enable() override;
+	void drv_disable() override;
+	bool is_rx_pending() override;
+	bool can_receive(gs_host_frame *frame) override;
+	bool can_send(gs_host_frame *frame) override;
+	bool can_drv_handle_bus_error(gs_host_frame *frame) override;
+	gs_can_state drv_get_state() override;
+	void can_drv_handle_state_change(gs_host_frame *frame) override;
+	void can_drv_handle_bus_off_recovery() override;
+	void get_device_state(gs_device_state *state) override;
+};
 #endif

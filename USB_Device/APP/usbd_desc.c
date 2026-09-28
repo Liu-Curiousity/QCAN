@@ -26,8 +26,6 @@
 #include "config.h"
 #include "usbd_ctlreq.h"
 #include "usbd_desc.h"
-#include "util.h"
-// #include "version.h"
 
 /* USER CODE BEGIN INCLUDE */
 

@@ -39,10 +39,10 @@
 
 class USBD_GS_CAN_HandleTypeDef {
 public:
-    template <std::size_t N>
-    explicit USBD_GS_CAN_HandleTypeDef(can_data_t (&channels)[N]) :
+    // template <std::size_t N>
+    explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel &channels) :
         from_host_buf{nullptr}, to_host_buf(nullptr),
-        channels(channels), channel_count(N), sof_timestamp_us(0) {
+        channels(&channels), channel_count(1), sof_timestamp_us(0) {
         INIT_LIST_HEAD(&list_frame_pool);
         INIT_LIST_HEAD(&list_to_host);
 
@@ -90,13 +90,14 @@ public:
     gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
     gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
 
-    can_data_t *channels;
+    // can_data_t *channels;
+    CAN_Channel *channels;
     size_t channel_count{};
 
     uint32_t sof_timestamp_us;
     volatile bool is_usb_suspend_cb{};
 
-    [[nodiscard]] can_data_t* GetChannel(const uint16_t ch) const {
+    [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
         return ch < channel_count ? &channels[ch] : nullptr;
     }
 

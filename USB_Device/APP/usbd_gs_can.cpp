@@ -70,7 +70,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgi
 uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
     if (!IsRequest(req)) return USBD_OK;
 
-    const can_data_t *channel = nullptr;
+    CAN_Channel *channel = nullptr;
     const void *src = nullptr;
     size_t len;
 
@@ -150,7 +150,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReq
             len = sizeof(ep0.term_state);
             break;
         case GS_USB_BREQ_GET_STATE:
-            can_get_device_state(channel, &ep0.state);
+            channel->get_device_state(&ep0.state);
             src = &ep0.state;
             len = sizeof(ep0.state);
             break;
@@ -201,7 +201,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
     /* Use the current transfer, not a saved request from a previous CAN write. */
     if (!IsRequest(&pdev->request)) return USBD_OK;
 
-    can_data_t *channel = nullptr;
+    CAN_Channel *channel = nullptr;
     USBD_SetupReqTypedef *req = &last_setup_request;
     /*
      * The control messages GS_USB_BREQ_HOST_FORMAT and
@@ -240,16 +240,16 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
              */
             break;
         case GS_USB_BREQ_BITTIMING: {
-            if (!can_set_bittiming(channel, &ep0.bittiming)) goto out_fail;
+            if (!channel->set_bittiming(&ep0.bittiming)) goto out_fail;
             break;
         }
         case GS_USB_BREQ_MODE: {
             const gs_device_mode *mode = &ep0.mode;
 
             if (mode->mode == GS_CAN_MODE_RESET) {
-                can_disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, channel);
+                channel->disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
             } else if (mode->mode == GS_CAN_MODE_START) {
-                if (!can_enable(channel, mode->feature)) goto out_fail;
+                if (!channel->enable(mode->feature)) goto out_fail;
             }
             break;
         }
@@ -257,12 +257,12 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
             if (ep0.identify_mode.mode) {
                 led.mode = signal_led::Mode::CONTINUES;
             } else {
-                led.mode = can_is_enabled(channel) ? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
+                led.mode = channel->is_enabled()? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
             }
             break;
         }
         case GS_USB_BREQ_DATA_BITTIMING: {
-            if (!can_set_data_bittiming(channel, &ep0.bittiming)) goto out_fail;
+            if (!channel->set_data_bittiming(&ep0.bittiming)) goto out_fail;
             break;
         }
         case GS_USB_BREQ_SET_TERMINATION: {
@@ -296,7 +296,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnu
 uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != GSUSB_ENDPOINT_OUT) return USBD_OK;
 
-    can_data_t *channel;
+    CAN_Channel *channel;
 
     /* If we do not have a valid incoming frame pointer, something broke. */
     if (!from_host_buf[0])
@@ -412,7 +412,7 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
 }
 
 static uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object) {
-    const can_data_t *channel = &hGS_CAN.channels[frame_object->frame.channel];
+    const CAN_Channel *channel = &hGS_CAN.channels[frame_object->frame.channel];
     const gs_host_frame *frame = &frame_object->frame;
     static uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];
     uint8_t *send_addr = (uint8_t *)frame;
@@ -495,9 +495,9 @@ void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev) {
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev) {
     // Disable CAN and go off bus on USB suspend
     for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-        can_data_t *channel = &hGS_CAN.channels[i];
+        CAN_Channel *channel = &hGS_CAN.channels[i];
 
-        can_disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool, channel);
+        channel->disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
     }
 
     hGS_CAN.is_usb_suspend_cb = true;

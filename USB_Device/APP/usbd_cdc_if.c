@@ -2,6 +2,7 @@
 #include "usbd_core.h"
 #include "usbd_ctlreq.h"
 #include "usbd_ioreq.h"
+#include "stdbool.h"
 #include "util.h"
 #include <string.h>
 

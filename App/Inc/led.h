@@ -76,7 +76,7 @@ public:
 
         static uint32_t next_update = 0;
         const uint32_t now = HAL_GetTick();
-        if (now > next_update) return;
+        if (now < next_update) return;
         next_update = now + 10;
 
         switch (mode) {
