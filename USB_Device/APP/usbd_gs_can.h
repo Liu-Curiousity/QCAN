@@ -74,7 +74,7 @@ union ep0 {
 class USBD_GS_CAN_HandleTypeDef {
 public:
     template <std::size_t N>
-    USBD_GS_CAN_HandleTypeDef(can_data_t (&channels)[N]) :
+    explicit USBD_GS_CAN_HandleTypeDef(can_data_t (&channels)[N]) :
         from_host_buf{nullptr}, to_host_buf(nullptr),
         channels(channels), channel_count(N), sof_timestamp_us(0) {
         INIT_LIST_HEAD(&list_frame_pool);
@@ -96,19 +96,64 @@ public:
 
     USBD_SetupReqTypedef last_setup_request{};
 
-    struct list_head list_frame_pool{}; // 共享空闲队列
-    struct list_head list_to_host{};    // 向主机发送帧的队列
+    list_head list_frame_pool{}; // 共享空闲队列
+    list_head list_to_host{};    // 向主机发送帧的队列
 
-    struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
-    struct gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
+    gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
+    gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
 
     can_data_t *channels;
     size_t channel_count{};
 
     uint32_t sof_timestamp_us;
+    volatile bool is_usb_suspend_cb{};
+
+    can_data_t* GetChannel(const uint16_t ch) const {
+        return ch < channel_count ? &channels[ch] : nullptr;
+    }
+
+    // Prefill the buffers from RX from host.
+    // Return true if pre-allocated buffer list buffer list
+    // was changed and is now ready, meaning and RX can be
+    // re-enabled, false otherwise.
+    // Must be called with IRQ disabled.
+    bool Prefill_RX_Buffers();
+
+    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev) const;
+
+    uint8_t out_prepare_receive(USBD_HandleTypeDef *pdev) const;
+
+    uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) const;
+
+    uint8_t DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+
+    // device info
+    const gs_device_config USBD_GS_CAN_dconf = {
+        .icount = NUM_CAN_CHANNEL - 1,
+        .sw_version = 2,
+        .hw_version = 1,
+    };
+
+    uint8_t Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
+
+    uint8_t EP0_RxReady(USBD_HandleTypeDef *pdev);
+
+    uint8_t DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
+
+    uint8_t DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
+
+    uint8_t SOF(USBD_HandleTypeDef *pdev);
+
+    /* Composite control callbacks are broadcast. Only handle gs_usb vendor
+     * requests, retaining support for device-recipient requests. */
+    static bool IsRequest(const USBD_SetupReqTypedef *req) {
+        return (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_VENDOR &&
+               ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE ||
+                ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE && req->wIndex == 0));
+    }
 
 private:
-    struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE]{}; // 共享池实际储存位置
+    gs_host_frame_object msgbuf[CAN_QUEUE_SIZE]{}; // 共享池实际储存位置
 } __attribute__ ((aligned (4)));
 
 extern "C" {

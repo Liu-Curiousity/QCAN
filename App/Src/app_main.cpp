@@ -12,21 +12,7 @@ USBD_GS_CAN_HandleTypeDef hGS_CAN{can_data};
 static USBD_HandleTypeDef hUSB;
 
 extern "C" void app_main() {
-    // INIT_LIST_HEAD(&hGS_CAN.list_frame_pool);
-    // INIT_LIST_HEAD(&hGS_CAN.list_to_host);
-    //
-    // for (unsigned i = 0; i < ARRAY_SIZE(hGS_CAN.msgbuf); i++) {
-    //     list_add_tail(&hGS_CAN.msgbuf[i].list, &hGS_CAN.list_frame_pool);
-    // }
-
     for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-        // can_data_t *channel = &hGS_CAN.channels[i];
-        //
-        // channel->nr = i;
-        //
-        // INIT_LIST_HEAD(&channel->list_from_host);
-        //
-        // channel->hcan = &hcan;
         can_disable(&hGS_CAN, &hGS_CAN.channels[i]);
     }
 
