@@ -44,6 +44,9 @@ extern "C" {
 #define CAN_LEC_CRC_ERROR	6
 #define CAN_LEC_SOFTWARE	7
 
+#ifdef __cplusplus
+}
+
 bool can_set_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
 bool can_set_data_bittiming(struct can_channel *channel, const struct gs_device_bittiming *timing);
 
@@ -62,7 +65,4 @@ void can_schedule_bus_off_recovery(struct can_channel *channel, uint32_t delay_m
 void CAN_SendFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
 void CAN_ReceiveFrame(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
 void CAN_HandleError(USBD_GS_CAN_HandleTypeDef *hcan, can_data_t *channel);
-
-#ifdef __cplusplus
-}
 #endif

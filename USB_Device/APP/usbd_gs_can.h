@@ -13,11 +13,6 @@
 #ifndef QCAN_USBD_GS_USB_H
 #define QCAN_USBD_GS_USB_H
 
-#ifdef __cplusplus
-extern "C" {
-
-#endif
-
 #include <stdbool.h>
 #include "usbd_def.h"
 #include "bxcan.h"
@@ -71,25 +66,53 @@ union ep0 {
     uint8_t __aligned(4) buf[sizeof(union ep0_data)];
 };
 
-typedef struct {
-    union ep0 ep0;
 
-    USBD_SetupReqTypedef last_setup_request;
+#ifdef __cplusplus
 
-    struct list_head list_frame_pool; // 共享空闲队列
-    struct list_head list_to_host;    // 向主机发送帧的队列
+#include "initializer_list"
+
+class USBD_GS_CAN_HandleTypeDef {
+public:
+    template <std::size_t N>
+    USBD_GS_CAN_HandleTypeDef(can_data_t (&channels)[N]) :
+        from_host_buf{nullptr}, to_host_buf(nullptr),
+        channels(channels), channel_count(N), sof_timestamp_us(0) {
+        INIT_LIST_HEAD(&list_frame_pool);
+        INIT_LIST_HEAD(&list_to_host);
+
+        for (auto& i : msgbuf) {
+            list_add_tail(&i.list, &list_frame_pool);
+        }
+
+        for (std::size_t i = 0; i < channel_count; ++i) {
+            this->channels[i].nr = i;
+            INIT_LIST_HEAD(&this->channels[i].list_from_host);
+            // this->channels[i].disable();
+            // can_disable(&hGS_CAN, channel);
+        }
+    }
+
+    union ep0 ep0{};
+
+    USBD_SetupReqTypedef last_setup_request{};
+
+    struct list_head list_frame_pool{}; // 共享空闲队列
+    struct list_head list_to_host{};    // 向主机发送帧的队列
 
     struct gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
     struct gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
 
-    can_data_t channels[NUM_CAN_CHANNEL];
+    can_data_t *channels;
+    size_t channel_count{};
 
     uint32_t sof_timestamp_us;
 
-    struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE]; // 共享池实际储存位置
+private:
+    struct gs_host_frame_object msgbuf[CAN_QUEUE_SIZE]{}; // 共享池实际储存位置
+} __attribute__ ((aligned (4)));
 
-} USBD_GS_CAN_HandleTypeDef __attribute__ ((aligned (4)));
-
+extern "C" {
+#endif
 
 extern USBD_ClassTypeDef USBD_GS_CAN;
 

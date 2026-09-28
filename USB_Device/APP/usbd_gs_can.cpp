@@ -12,7 +12,7 @@ extern USBD_GS_CAN_HandleTypeDef hGS_CAN;
 volatile bool is_usb_suspend_cb;
 
 static can_data_t* USBD_GS_CAN_GetChannel(USBD_GS_CAN_HandleTypeDef *hcan, const uint16_t ch) {
-	return ch < ARRAY_SIZE(hcan->channels) ? &hcan->channels[ch] : NULL;
+	return ch < hcan->channel_count ? &hcan->channels[ch] : NULL;
 }
 
 // Prefill the buffers from RX from host.
@@ -547,7 +547,7 @@ void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev)
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev)
 {
 	// Disable CAN and go off bus on USB suspend
-	for (unsigned int i = 0; i < ARRAY_SIZE(hGS_CAN.channels); i++) {
+	for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
 		can_data_t *channel = &hGS_CAN.channels[i];
 
 		can_disable(&hGS_CAN, channel);
