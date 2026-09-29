@@ -98,7 +98,7 @@ public:
 
     void disable(list_head *plist_to_host, list_head *plist_frame_pool);
 
-    void CAN_SendFrame(list_head *plist_to_host);
+    void CAN_SendFrame();
 
     void CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool);
 

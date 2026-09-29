@@ -9,21 +9,8 @@
 
 extern USBD_GS_CAN_HandleTypeDef hGS_CAN;
 
-bool USBD_GS_CAN_HandleTypeDef::Prefill_RX_Buffers() {
-    bool changed = false;
-    for (auto& frame : from_host_buf) {
-        if (frame) continue;
-        // 从共享池获取空闲的帧对象，用于接收主机发送的数据帧
-        frame = list_first_entry_or_null(&list_frame_pool, struct gs_host_frame_object, list);
-        if (!frame) return false;
-        list_del(&frame->list);
-        changed = true;
-    }
-    return changed;
-}
-
-uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) const {
-    gs_host_frame *frame = &from_host_buf[0]->frame;
+uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) {
+    gs_host_frame *frame = &from_host_buf.frame;
     uint16_t size;
 
     if (IS_ENABLED(CONFIG_CANFD)) {
@@ -35,17 +22,12 @@ uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) cons
     return USBD_LL_PrepareReceive(pdev, GSUSB_ENDPOINT_OUT, (uint8_t *)frame, size);
 }
 
-uint8_t USBD_GS_CAN_HandleTypeDef::out_prepare_receive(USBD_HandleTypeDef *pdev) const {
-    // We can not unconditionally re-enable RX if the pre-allocated
-    // buffers are not fully ready.
-    for (const auto frame : from_host_buf) {
-        if (!frame) return USBD_OK;
-    }
+uint8_t USBD_GS_CAN_HandleTypeDef::out_prepare_receive(USBD_HandleTypeDef *pdev) {
     PrepareReceive(pdev);
     return USBD_OK;
 }
 
-uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) const {
+uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_IN, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_OUT, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
     PrepareReceive(pdev);
@@ -54,13 +36,6 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx
 
 uint8_t USBD_GS_CAN_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     // 1. purge to_host_buf
-    const bool was_irq_enabled = disable_irq();
-    if (to_host_buf) {
-        list_add_tail(&to_host_buf->list, &list_frame_pool);
-        to_host_buf = nullptr;
-    }
-    restore_irq(was_irq_enabled);
-
     is_usb_suspend_cb = false;
     USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
     USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_OUT);
@@ -296,61 +271,42 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnu
 uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != GSUSB_ENDPOINT_OUT) return USBD_OK;
 
-    CAN_Channel *channel;
-
-    /* If we do not have a valid incoming frame pointer, something broke. */
-    if (!from_host_buf[0])
-        __BKPT(0);
 
     uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
-    if (rxlen < (struct_size(&from_host_buf[0]->frame, classic_can, 1))) {
+    if (rxlen < (struct_size(&from_host_buf.frame, classic_can, 1))) {
         // Invalid frame length, just ignore it and receive into the same buffer
         // again next time.
         return out_prepare_receive(pdev);
     }
 
-    channel = GetChannel(from_host_buf[0]->frame.channel);
+    CAN_Channel *channel = GetChannel(from_host_buf.frame.channel);
     if (!channel) {
         return out_prepare_receive(pdev);
     }
 
     if (IS_ENABLED(CONFIG_CANFD) &&
-        from_host_buf[0]->frame.flags & GS_CAN_FLAG_FD &&
-        rxlen < struct_size(&from_host_buf[0]->frame, canfd, 1)) {
+        from_host_buf.frame.flags & GS_CAN_FLAG_FD &&
+        rxlen < struct_size(&from_host_buf.frame, canfd, 1)) {
         return out_prepare_receive(pdev);
     }
 
-    bool was_irq_enabled = disable_irq();
     // Enqueue the frame we just received.
     // TODO: 未处理溢出
-    xQueueSendToBack(channel->xQueue_from_host, &from_host_buf[0]->_buf, 0);
-    list_add_tail(&from_host_buf[0]->list, &list_frame_pool);
-
-    int last;
-    for (last = 0; last < (int)ARRAY_SIZE(from_host_buf) - 1; ++last)
-        from_host_buf[last] = from_host_buf[last + 1];
-    from_host_buf[last] = nullptr;
-
-    if (Prefill_RX_Buffers()) {
-        restore_irq(was_irq_enabled);
-
-        // All RX buffers are ready. Enable RX.
-        PrepareReceive(pdev);
-    } else {
-        restore_irq(was_irq_enabled);
+    bool queue_overflow = xQueueSendToBack(channel->xQueue_from_host, &from_host_buf._buf, 0) != pdPASS;
 
 #if defined(USB) || defined(USB_DRD_FS)
-        // Not all RX buffers are ready. We got enough in the
-        // pre-allocated reserve to ensure callbacks which are going
-        // to be called due to USB frames being received into double
-        // buffer, but disable further RX. If double buffer not in use,
-        // RX would have already been disabled by USB HW.
-        PrepareReceive(pdev);
+    // Not all RX buffers are ready. We got enough in the
+    // pre-allocated reserve to ensure callbacks which are going
+    // to be called due to USB frames being received into double
+    // buffer, but disable further RX. If double buffer not in use,
+    // RX would have already been disabled by USB HW.
+    PrepareReceive(pdev);
+    if (queue_overflow)
         PCD_SET_EP_RX_STATUS(((PCD_HandleTypeDef *)pdev->pData)->Instance,
-                             GSUSB_ENDPOINT_OUT,
-                             USB_EP_RX_NAK);
+                         GSUSB_ENDPOINT_OUT,
+                         USB_EP_RX_NAK);
 #endif
-    }
+
     return USBD_OK;
 }
 
@@ -395,13 +351,7 @@ USBD_ClassTypeDef USBD_GS_CAN = {
 };
 
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev) {
-    const bool was_irq_enabled = disable_irq();
-
-    // Reserve the multiple RX buffers we need to ensure no frame loss
-    // with OUT endpoint double-buffering before (re)starting the RX. */
-    if (hGS_CAN.Prefill_RX_Buffers()) hGS_CAN.PrepareReceive(pdev);
-
-    restore_irq(was_irq_enabled);
+    // hGS_CAN.PrepareReceive(pdev);
 }
 
 static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t len) {

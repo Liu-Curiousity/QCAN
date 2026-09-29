@@ -146,7 +146,7 @@ void CAN_Channel::disable(list_head *plist_to_host, list_head *plist_frame_pool)
 	led.mode = signal_led::Mode::OFF;
 }
 
-void CAN_Channel::CAN_SendFrame(list_head *plist_to_host) {
+void CAN_Channel::CAN_SendFrame() {
 	static bool datain_request = false;
 	gs_host_frame_object rx_frame{};
 	if (!datain_request && xQueueReceive(xQueue_from_host, rx_frame._buf, 0) == pdPASS) {

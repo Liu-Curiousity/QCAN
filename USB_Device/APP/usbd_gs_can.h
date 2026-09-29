@@ -23,15 +23,6 @@
 #define CAN_DATA_MAX_PACKET_SIZE 32    /* Endpoint IN & OUT Packet size */
 #endif
 
-// When using double buffer for RX, this needs to be at least 2 to
-// ensure there is always an RX buffer ready to receive the
-// RX frames.
-#if defined(USB) || defined(USB_DRD_FS)
-#define USBD_GS_CAN_RX_BUFFER_COUNT 2
-#else
-#define USBD_GS_CAN_RX_BUFFER_COUNT 1
-#endif
-
 #ifdef __cplusplus
 
 #include <algorithm>
@@ -40,9 +31,9 @@
 class USBD_GS_CAN_HandleTypeDef {
 public:
     // template <std::size_t N>
-    explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel &channels) :
-        from_host_buf{nullptr}, to_host_buf(nullptr),
-        channels(&channels), channel_count(1), sof_timestamp_us(0) {
+    explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
+        from_host_buf{nullptr}, channels(&channels),
+        channel_count(1), sof_timestamp_us(0) {
         INIT_LIST_HEAD(&list_frame_pool);
         INIT_LIST_HEAD(&list_to_host);
 
@@ -84,8 +75,7 @@ public:
     list_head list_frame_pool{}; // 共享空闲队列
     list_head list_to_host{};    // 向主机发送帧的队列
 
-    gs_host_frame_object *from_host_buf[USBD_GS_CAN_RX_BUFFER_COUNT]; // 从主机接收到帧后使用的双缓冲指针
-    gs_host_frame_object *to_host_buf;                                // 向主机发送帧时使用的缓冲指针
+    gs_host_frame_object from_host_buf; // 从主机接收到帧后使用的双缓冲指针
 
     // can_data_t *channels;
     CAN_Channel *channels;
@@ -98,18 +88,11 @@ public:
         return ch < channel_count ? &channels[ch] : nullptr;
     }
 
-    // Prefill the buffers from RX from host.
-    // Return true if pre-allocated buffer list buffer list
-    // was changed and is now ready, meaning and RX can be
-    // re-enabled, false otherwise.
-    // Must be called with IRQ disabled.
-    bool Prefill_RX_Buffers();
+    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev) ;
 
-    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev) const;
+    uint8_t out_prepare_receive(USBD_HandleTypeDef *pdev);
 
-    uint8_t out_prepare_receive(USBD_HandleTypeDef *pdev) const;
-
-    uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) const;
+    uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
 
     uint8_t DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
 
