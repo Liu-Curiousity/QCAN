@@ -27,7 +27,6 @@
 #pragma once
 
 #include "compiler.h"
-#include "main.h"
 
 #define CAN_ERROR_WARNING_THRESHOLD	 96
 #define CAN_ERROR_PASSIVE_THRESHOLD	 128
@@ -96,7 +95,7 @@ public:
 
     bool enable(uint32_t feature_);
 
-    void disable(list_head *plist_to_host, list_head *plist_frame_pool);
+    void disable();
 
     void CAN_SendFrame();
 

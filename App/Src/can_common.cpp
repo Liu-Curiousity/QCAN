@@ -114,6 +114,7 @@ bool CAN_Channel::is_enabled() const {
 }
 
 bool CAN_Channel::enable(const uint32_t feature_) {
+	xQueueReset(xQueue_from_host);
 	led.mode = signal_led::Mode::NORMAL;
 	feature = feature_;
 	state = GS_CAN_STATE_ERROR_ACTIVE;
@@ -121,24 +122,8 @@ bool CAN_Channel::enable(const uint32_t feature_) {
 	return true;
 }
 
-void CAN_Channel::disable(list_head *plist_to_host, list_head *plist_frame_pool) {
+void CAN_Channel::disable() {
 	drv_disable();
-
-	// list_splice_tail_init_locked(&list_from_host, plist_frame_pool);
-
-	if (NUM_CAN_CHANNEL == 1) {
-		list_splice_tail_init_locked(plist_to_host, plist_frame_pool);
-	} else {
-		gs_host_frame_object *iter, *next;
-		const bool was_irq_enabled = disable_irq();
-
-		list_for_each_entry_safe(iter, next, plist_to_host, list) {
-			if (iter->frame.channel == nr) {
-				list_move_tail(&iter->list, plist_frame_pool);
-			}
-		}
-		restore_irq(was_irq_enabled);
-	}
 	bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
 	state = GS_CAN_STATE_STOPPED;
 	feature = 0;

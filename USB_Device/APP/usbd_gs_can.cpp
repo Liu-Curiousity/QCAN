@@ -30,6 +30,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::out_prepare_receive(USBD_HandleTypeDef *pdev)
 uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_IN, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_OUT, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
+    xQueueReset(xQueue_to_host);
     PrepareReceive(pdev);
     return USBD_OK;
 }
@@ -222,7 +223,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
             const gs_device_mode *mode = &ep0.mode;
 
             if (mode->mode == GS_CAN_MODE_RESET) {
-                channel->disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
+                channel->disable();
             } else if (mode->mode == GS_CAN_MODE_START) {
                 if (!channel->enable(mode->feature)) goto out_fail;
             }
@@ -414,7 +415,7 @@ void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev) {
     for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
         CAN_Channel *channel = &hGS_CAN.channels[i];
 
-        channel->disable(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
+        channel->disable();
     }
 
     hGS_CAN.is_usb_suspend_cb = true;

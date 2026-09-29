@@ -17,17 +17,10 @@ bxcan_ can_data{&hcan, 0};
 USBD_GS_CAN_HandleTypeDef hGS_CAN{can_data};
 static USBD_HandleTypeDef hUSB;
 
-xQueueHandle xQueueCAN;
-
 uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object);
 
 void StartDebugTask(void *argument) {
     gs_host_frame_object rx_frame{};
-    // gs_host_frame contains a flexible payload; queue the entire backing buffer.
-    xQueueCAN = xQueueCreate(10, GS_HOST_FRAME_SIZE);
-    if (xQueueCAN == nullptr) {
-        Error_Handler();
-    }
 
     USBD_Init(&hUSB, &FS_Desc, DEVICE_FS);
     USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
@@ -43,7 +36,7 @@ void StartDebugTask(void *argument) {
         USBD_GS_CAN_ReceiveFromHost(&hUSB);
 
         /*==========================向上位机发送帧============================*/
-        if (!datain_request && xQueueReceive(xQueueCAN, rx_frame._buf, 0) == pdPASS) {
+        if (!datain_request && xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) == pdPASS) {
             datain_request = true;
             led.blink_request(signal_led::LED_RX);
         }
@@ -80,7 +73,7 @@ extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
             rx_frame.channel = can_data.nr;
             rx_frame.flags = queue_overflow ? GS_CAN_FLAG_OVERFLOW : 0;
 
-            queue_overflow = xQueueSendToBackFromISR(xQueueCAN, rx_object._buf, &xHigherPriorityTaskWoken) != pdPASS;
+            queue_overflow = xQueueSendToBackFromISR(hGS_CAN.xQueue_to_host, rx_object._buf, &xHigherPriorityTaskWoken) != pdPASS;
         }
         portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }

@@ -28,9 +28,6 @@
 #include "config.h"
 #include "gs_usb.h"
 #include "main.h"
-#define new new_
-#include "list.h"
-#undef new
 
 #ifdef __cplusplus
 extern "C" {

@@ -32,18 +32,12 @@ class USBD_GS_CAN_HandleTypeDef {
 public:
     // template <std::size_t N>
     explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
-        from_host_buf{nullptr}, channels(&channels),
-        channel_count(1), sof_timestamp_us(0) {
-        INIT_LIST_HEAD(&list_frame_pool);
-        INIT_LIST_HEAD(&list_to_host);
-
-        for (auto& i : msgbuf) {
-            list_add_tail(&i.list, &list_frame_pool);
-        }
+        channels(&channels), channel_count(1), sof_timestamp_us(0) {
+        xQueue_to_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
 
         for (std::size_t i = 0; i < channel_count; ++i) {
             this->channels[i].nr = i;
-            this->channels[i].disable(&list_to_host, &list_frame_pool);
+            this->channels[i].disable();
         }
     }
 
@@ -72,10 +66,9 @@ public:
 
     USBD_SetupReqTypedef last_setup_request{};
 
-    list_head list_frame_pool{}; // 共享空闲队列
-    list_head list_to_host{};    // 向主机发送帧的队列
+    xQueueHandle xQueue_to_host; // 向主机发送帧的队列
 
-    gs_host_frame_object from_host_buf; // 从主机接收到帧后使用的双缓冲指针
+    gs_host_frame_object from_host_buf{}; // 从主机接收到帧后使用的双缓冲指针
 
     // can_data_t *channels;
     CAN_Channel *channels;
@@ -88,7 +81,7 @@ public:
         return ch < channel_count ? &channels[ch] : nullptr;
     }
 
-    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev) ;
+    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
 
     uint8_t out_prepare_receive(USBD_HandleTypeDef *pdev);
 
@@ -122,11 +115,12 @@ public:
     }
 
 private:
-    gs_host_frame_object msgbuf[CAN_QUEUE_SIZE]{}; // 共享池实际储存位置
 } __attribute__ ((aligned (4)));
 
 extern "C" {
 #endif
+
+#include <stdbool.h>
 
 extern USBD_ClassTypeDef USBD_GS_CAN;
 

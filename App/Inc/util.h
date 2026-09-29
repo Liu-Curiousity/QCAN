@@ -25,6 +25,7 @@
 
 #pragma once
 
+#include <stddef.h>
 #include <stdbool.h>
 #include <stm32f072xb.h>
 
