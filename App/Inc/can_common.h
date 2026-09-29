@@ -98,8 +98,6 @@ public:
 
     void CAN_SendFrame(list_head *plist_to_host);
 
-    void CAN_ReceiveFrame(list_head *plist_to_host, list_head *plist_frame_pool);
-
     void CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool);
 
     static bool can_is_lec_error(uint8_t lec);
@@ -109,7 +107,6 @@ private:
     virtual void drv_disable() = 0;
     virtual bool is_rx_pending() = 0;
     virtual bool can_send(gs_host_frame *frame) = 0;
-    virtual bool can_receive(gs_host_frame *frame) = 0;
     virtual gs_can_state drv_get_state() = 0;
     virtual void can_drv_handle_state_change(gs_host_frame *frame) = 0;
     virtual bool can_drv_handle_bus_error(gs_host_frame *frame) = 0;

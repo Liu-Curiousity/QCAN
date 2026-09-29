@@ -66,7 +66,10 @@ void bxcan_::drv_enable()
 		Error_Handler();
 	}
 
-	HAL_CAN_Start(hcan);
+	if (HAL_CAN_Start(hcan) != HAL_OK ||
+	    HAL_CAN_ActivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK) {
+		Error_Handler();
+	}
 }
 
 void bxcan_::drv_disable() {
@@ -75,23 +78,6 @@ void bxcan_::drv_disable() {
 
 bool bxcan_::is_rx_pending() {
 	return (hcan->Instance->RF0R & CAN_RF0R_FMP0) != 0;
-}
-
-bool bxcan_::can_receive(gs_host_frame *rx_frame) {
-	if (HAL_CAN_GetRxFifoFillLevel(hcan,CAN_RX_FIFO0)) {
-		CAN_RxHeaderTypeDef rx_header;
-		HAL_CAN_GetRxMessage(hcan,CAN_RX_FIFO0, &rx_header, rx_frame->classic_can->data);
-		rx_frame->classic_can_ts->timestamp_us = timer_get();
-		rx_frame->can_dlc = rx_header.DLC;
-		rx_frame->can_id = rx_header.IDE & CAN_ID_EXT ? rx_header.ExtId : rx_header.StdId;
-		if (rx_header.IDE & CAN_ID_EXT) rx_frame->can_id |= CAN_EFF_FLAG;
-		if (rx_header.RTR & CAN_RTR_REMOTE) rx_frame->can_id |= CAN_RTR_REMOTE;
-		rx_frame->channel = nr;
-		rx_frame->flags = 0;
-		return true;
-	} else {
-		return false;
-	}
 }
 
 bool bxcan_::can_send(gs_host_frame *frame) {

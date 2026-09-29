@@ -125,7 +125,6 @@ private:
 	void drv_enable() override;
 	void drv_disable() override;
 	bool is_rx_pending() override;
-	bool can_receive(gs_host_frame *frame) override;
 	bool can_send(gs_host_frame *frame) override;
 	bool can_drv_handle_bus_error(gs_host_frame *frame) override;
 	gs_can_state drv_get_state() override;

@@ -53,9 +53,7 @@ public:
         for (std::size_t i = 0; i < channel_count; ++i) {
             this->channels[i].nr = i;
             INIT_LIST_HEAD(&this->channels[i].list_from_host);
-            // this->channels[i].disable();
-            // TODO: 不能在此处disable,可能在CAN外设初始化之前运行
-            // can_disable(&list_to_host, &list_frame_pool, &this->channels[i]);
+            this->channels[i].disable(&list_to_host, &list_frame_pool);
         }
     }
 

@@ -178,27 +178,6 @@ void CAN_Channel::CAN_SendFrame(list_head *plist_to_host) {
 	led.blink_request(signal_led::LED_TX);
 }
 
-void CAN_Channel::CAN_ReceiveFrame(list_head *plist_to_host,list_head *plist_frame_pool) {
-	if (!is_rx_pending()) return;
-
-	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
-	if (!frame_object) return;
-
-	gs_host_frame *frame = &frame_object->frame;
-
-	if (!can_receive(frame)) {
-		list_add_tail_locked(&frame_object->list, plist_frame_pool);
-		return;
-	}
-
-	frame->echo_id = GS_HOST_FRAME_ECHO_ID_RX; // not an echo frame
-	frame->reserved = 0;
-
-	list_add_tail_locked(&frame_object->list, plist_to_host);
-
-	led.blink_request(signal_led::LED_RX);
-}
-
 void CAN_Channel::CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool) {
 	if (is_rx_pending()) return;
 
