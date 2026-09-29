@@ -284,10 +284,10 @@ out_fail:
 uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != (GSUSB_ENDPOINT_IN & 0x7F)) return USBD_OK;
 
-    const bool was_irq_enabled = disable_irq();
-    list_add_tail(&to_host_buf->list, &list_frame_pool);
-    to_host_buf = nullptr;
-    restore_irq(was_irq_enabled);
+    // const bool was_irq_enabled = disable_irq();
+    // list_add_tail(&to_host_buf->list, &list_frame_pool);
+    // to_host_buf = nullptr;
+    // restore_irq(was_irq_enabled);
 
     return USBD_OK;
 }
@@ -411,7 +411,7 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
     }
 }
 
-static uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object) {
+uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object) {
     const CAN_Channel *channel = &hGS_CAN.channels[frame_object->frame.channel];
     const gs_host_frame *frame = &frame_object->frame;
     static uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];
@@ -456,40 +456,40 @@ static uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_obj
     return USBD_GS_CAN_Transmit(pdev, send_addr, len);
 }
 
-void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev) {
-    bool was_irq_enabled = disable_irq();
-    if (hGS_CAN.to_host_buf) {
-        restore_irq(was_irq_enabled);
-        return;
-    }
-
-    hGS_CAN.to_host_buf =
-        list_first_entry_or_null(&hGS_CAN.list_to_host, struct gs_host_frame_object, list);
-    if (!hGS_CAN.to_host_buf) {
-        restore_irq(was_irq_enabled);
-        return;
-    }
-
-    list_del(&hGS_CAN.to_host_buf->list);
-    restore_irq(was_irq_enabled);
-
-    if (USBD_GS_CAN_SendFrame(pdev, hGS_CAN.to_host_buf) == USBD_OK)
-        return;
-
-    /*
-     * If USBD_GS_CAN_SendFrame() fails, it will be due to a USB suspend event
-     * (is_usb_suspend_cb == true).
-     * For now the firmware shuts down the CAN interface during suspend and
-     * hcan->to_host_buf is pruged by usbd_gs_can_purge_to_host_buf() during
-     * USBD_GS_CAN_DeInit().
-     */
-    was_irq_enabled = disable_irq();
-    if (hGS_CAN.to_host_buf) {
-        list_add_tail(&hGS_CAN.to_host_buf->list, &hGS_CAN.list_frame_pool);
-        hGS_CAN.to_host_buf = nullptr;
-    }
-    restore_irq(was_irq_enabled);
-}
+// void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev) {
+//     bool was_irq_enabled = disable_irq();
+//     if (hGS_CAN.to_host_buf) {
+//         restore_irq(was_irq_enabled);
+//         return;
+//     }
+//
+//     hGS_CAN.to_host_buf =
+//         list_first_entry_or_null(&hGS_CAN.list_to_host, struct gs_host_frame_object, list);
+//     if (!hGS_CAN.to_host_buf) {
+//         restore_irq(was_irq_enabled);
+//         return;
+//     }
+//
+//     list_del(&hGS_CAN.to_host_buf->list);
+//     restore_irq(was_irq_enabled);
+//
+//     if (USBD_GS_CAN_SendFrame(pdev, hGS_CAN.to_host_buf) == USBD_OK)
+//         return;
+//
+//     /*
+//      * If USBD_GS_CAN_SendFrame() fails, it will be due to a USB suspend event
+//      * (is_usb_suspend_cb == true).
+//      * For now the firmware shuts down the CAN interface during suspend and
+//      * hcan->to_host_buf is pruged by usbd_gs_can_purge_to_host_buf() during
+//      * USBD_GS_CAN_DeInit().
+//      */
+//     was_irq_enabled = disable_irq();
+//     if (hGS_CAN.to_host_buf) {
+//         list_add_tail(&hGS_CAN.to_host_buf->list, &hGS_CAN.list_frame_pool);
+//         hGS_CAN.to_host_buf = nullptr;
+//     }
+//     restore_irq(was_irq_enabled);
+// }
 
 // Handle USB suspend event
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev) {

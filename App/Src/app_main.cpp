@@ -19,6 +19,8 @@ static USBD_HandleTypeDef hUSB;
 
 xQueueHandle xQueueCAN;
 
+uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object);
+
 void StartDebugTask(void *argument) {
     gs_host_frame_object rx_frame{};
     // gs_host_frame contains a flexible payload; queue the entire backing buffer.
@@ -31,36 +33,29 @@ void StartDebugTask(void *argument) {
     USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
     hUSB.pClassData = &hcomposite;
     USBD_Start(&hUSB);
+    static bool datain_request = false;
     while (true) {
-        if (xQueueReceive(xQueueCAN, rx_frame._buf, 0) == pdPASS) {
-            // USB owns each node until DataIn returns it to the frame pool.
-            const bool was_irq_enabled = disable_irq();
-            gs_host_frame_object *frame_object =
-                list_first_entry_or_null(&hGS_CAN.list_frame_pool, gs_host_frame_object, list);
-            if (can_data.is_enabled() && frame_object != nullptr) {
-                list_del(&frame_object->list);
-                std::memcpy(frame_object->_buf, rx_frame._buf, GS_HOST_FRAME_SIZE);
-                list_add_tail(&frame_object->list, &hGS_CAN.list_to_host);
-                led.blink_request(signal_led::LED_RX);
-            }
-            restore_irq(was_irq_enabled);
-        }
-
-
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            CAN_Channel *channel = &hGS_CAN.channels[i];
-
-            channel->CAN_SendFrame(&hGS_CAN.list_to_host);
+            hGS_CAN.channels[i].CAN_SendFrame(&hGS_CAN.list_frame_pool);
         }
 
+        /*==========================从上位机接收帧============================*/
         USBD_GS_CAN_ReceiveFromHost(&hUSB);
-        USBD_GS_CAN_SendToHost(&hUSB);
+
+        /*==========================向上位机发送帧============================*/
+        if (!datain_request && xQueueReceive(xQueueCAN, rx_frame._buf, 0) == pdPASS) {
+            datain_request = true;
+            led.blink_request(signal_led::LED_RX);
+        }
+        if (datain_request == true) {
+            hGS_CAN.to_host_buf = &rx_frame;
+            if (USBD_GS_CAN_SendFrame(&hUSB, &rx_frame) == USBD_OK) {
+                datain_request = false;
+            }
+        }
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            CAN_Channel *channel = &hGS_CAN.channels[i];
-
-            channel->CAN_HandleError(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
-
+            hGS_CAN.channels[i].CAN_HandleError(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
             led.update();
         }
     }

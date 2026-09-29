@@ -151,7 +151,7 @@ extern USBD_ClassTypeDef USBD_GS_CAN;
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev);
 void USBD_GS_CAN_ResumeCallback(USBD_HandleTypeDef *pdev);
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
-void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev);
+// void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev);
 bool USBD_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 bool USBD_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 #ifdef __cplusplus
