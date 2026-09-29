@@ -47,7 +47,7 @@ void StartDebugTask(void *argument) {
         }
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            // hGS_CAN.channels[i].CAN_HandleError(&hGS_CAN.list_to_host, &hGS_CAN.list_frame_pool);
+            hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.xQueue_to_host);
             led.update();
         }
     }

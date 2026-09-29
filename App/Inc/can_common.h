@@ -51,9 +51,6 @@
 #define GS_HOST_FRAME_SIZE struct_size((struct gs_host_frame *)NULL, classic_can_ts, 1)
 #endif
 
-#define new new_
-#include "list.h"
-#undef new
 #include "gs_usb.h"
 #include "FreeRTOS.h"
 #include "queue.h"
@@ -62,8 +59,6 @@ extern const gs_device_bt_const CAN_btconst;
 extern const gs_device_bt_const_extended CAN_btconst_ext;
 
 struct gs_host_frame_object {
-    list_head list;
-
     union {
         uint8_t _buf[GS_HOST_FRAME_SIZE];
         gs_host_frame frame;
@@ -99,7 +94,7 @@ public:
 
     void CAN_SendFrame();
 
-    void CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool);
+    void CAN_HandleError(xQueueHandle xQueue_to_host);
 
     static bool can_is_lec_error(uint8_t lec);
 
@@ -119,21 +114,19 @@ private:
 
     void can_schedule_bus_off_recovery(uint32_t delay_ms);
 
-    static gs_host_frame_object* gs_host_frame_object_get_locked(const list_head *plist);
-
     bool can_state_change_pending();
 
-    void can_handle_state_change(list_head *plist_to_host, list_head *plist_frame_pool);
+    void can_handle_state_change(xQueueHandle xQueue_to_host);
 
     void can_prepare_error_frame(gs_host_frame *frame) const;
 
     bool can_bus_error_pending();
 
-    void can_handle_bus_error(list_head *plist_to_host, list_head *plist_frame_pool);
+    void can_handle_bus_error(xQueueHandle xQueue_to_host);
 
     bool can_bus_off_recovery_pending() const;
 
-    void can_handle_bus_off_recovery(list_head *plist_to_host, list_head *plist_frame_pool);
+    void can_handle_bus_off_recovery(xQueueHandle xQueue_to_host);
 };
 
 #endif

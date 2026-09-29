@@ -83,17 +83,6 @@ void CAN_Channel::can_schedule_bus_off_recovery(const uint32_t delay_ms) {
 		bus_off_restart++;
 }
 
-gs_host_frame_object* CAN_Channel::gs_host_frame_object_get_locked(const list_head *plist) {
-	const bool was_irq_enabled = disable_irq();
-	gs_host_frame_object *frame_object =
-		list_first_entry_or_null(plist, struct gs_host_frame_object, list);
-
-	if (frame_object) list_del(&frame_object->list);
-
-	restore_irq(was_irq_enabled);
-	return frame_object;
-}
-
 bool CAN_Channel::set_bittiming(const gs_device_bittiming *timing) {
 	if (!check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
 	bittiming = *timing;
@@ -153,17 +142,17 @@ void CAN_Channel::CAN_SendFrame() {
 	// list_add_tail_locked(&frame_object->list, plist_to_host);
 }
 
-void CAN_Channel::CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool) {
+void CAN_Channel::CAN_HandleError(xQueueHandle xQueue_to_host) {
 	if (is_rx_pending()) return;
 
 	can_drv_read_reg_status();
 
 	if (can_state_change_pending()) {
-		can_handle_state_change(plist_to_host, plist_frame_pool);
+		can_handle_state_change(xQueue_to_host);
 	} else if (can_bus_error_pending()) {
-		can_handle_bus_error(plist_to_host, plist_frame_pool);
+		can_handle_bus_error(xQueue_to_host);
 	} else if (can_bus_off_recovery_pending()) {
-		can_handle_bus_off_recovery(plist_to_host, plist_frame_pool);
+		can_handle_bus_off_recovery(xQueue_to_host);
 	}
 }
 
@@ -186,11 +175,10 @@ bool CAN_Channel::can_state_change_pending() {
 }
 
 
-void CAN_Channel::can_handle_state_change(list_head *plist_to_host, list_head *plist_frame_pool) {
-	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
-	if (!frame_object) return;
+void CAN_Channel::can_handle_state_change(xQueueHandle xQueue_to_host) {
+	gs_host_frame_object frame_object;
 
-	gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object.frame;
 	can_prepare_error_frame(frame);
 
 	if (state == GS_CAN_STATE_BUS_OFF) {
@@ -203,8 +191,7 @@ void CAN_Channel::can_handle_state_change(list_head *plist_to_host, list_head *p
 		can_drv_handle_state_change(frame);
 		can_drv_handle_bus_error(frame);
 	}
-
-	list_add_tail_locked(&frame_object->list, plist_to_host);
+	xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
 }
 
 void CAN_Channel::can_prepare_error_frame(gs_host_frame *frame) const {
@@ -226,17 +213,14 @@ bool CAN_Channel::can_bus_error_pending() {
 	return can_drv_bus_error_pending();
 }
 
-void CAN_Channel::can_handle_bus_error(list_head *plist_to_host, list_head *plist_frame_pool) {
-	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
-	if (!frame_object) return;
+void CAN_Channel::can_handle_bus_error(xQueueHandle xQueue_to_host) {
+	gs_host_frame_object frame_object{};
 
-	gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object.frame;
 
 	can_prepare_error_frame(frame);
 	if (can_drv_handle_bus_error(frame)) {
-		list_add_tail_locked(&frame_object->list, plist_to_host);
-	} else {
-		list_add_locked(&frame_object->list, plist_frame_pool);
+		xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
 	}
 }
 
@@ -246,22 +230,20 @@ bool CAN_Channel::can_bus_off_recovery_pending() const {
 
 	const uint32_t now = HAL_GetTick();
 
-	return bus_off_restart - now < 0;
+	return static_cast<int32_t>(now - bus_off_restart) >= 0;
 }
 
-void CAN_Channel::can_handle_bus_off_recovery(list_head *plist_to_host, list_head *plist_frame_pool) {
+void CAN_Channel::can_handle_bus_off_recovery(xQueueHandle xQueue_to_host) {
 	can_drv_handle_bus_off_recovery();
 
 	bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
 
-	gs_host_frame_object *frame_object = gs_host_frame_object_get_locked(plist_frame_pool);
-	if (!frame_object)
-		return;
+	gs_host_frame_object frame_object{};
 
-	gs_host_frame *frame = &frame_object->frame;
+	gs_host_frame *frame = &frame_object.frame;
 	can_prepare_error_frame(frame);
 
 	frame->can_id |= CAN_ERR_RESTARTED;
 
-	list_add_tail_locked(&frame_object->list, plist_to_host);
+	xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
 }
