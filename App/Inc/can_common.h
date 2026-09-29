@@ -56,6 +56,8 @@
 #include "list.h"
 #undef new
 #include "gs_usb.h"
+#include "FreeRTOS.h"
+#include "queue.h"
 
 extern const gs_device_bt_const CAN_btconst;
 extern const gs_device_bt_const_extended CAN_btconst_ext;
@@ -74,10 +76,10 @@ public:
     virtual ~CAN_Channel() = default;
 
     CAN_Channel(uint8_t nr) : nr(nr) {
-        INIT_LIST_HEAD(&list_from_host);
+        xQueue_from_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
     }
 
-    list_head list_from_host{}; // 待发送到CAN总线的帧队列
+    xQueueHandle xQueue_from_host; // 待发送到CAN总线的帧队列
     uint32_t feature{};
     gs_can_state state{GS_CAN_STATE_STOPPED};
     uint32_t bus_off_restart{};

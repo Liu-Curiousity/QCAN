@@ -124,7 +124,7 @@ bool CAN_Channel::enable(const uint32_t feature_) {
 void CAN_Channel::disable(list_head *plist_to_host, list_head *plist_frame_pool) {
 	drv_disable();
 
-	list_splice_tail_init_locked(&list_from_host, plist_frame_pool);
+	// list_splice_tail_init_locked(&list_from_host, plist_frame_pool);
 
 	if (NUM_CAN_CHANNEL == 1) {
 		list_splice_tail_init_locked(plist_to_host, plist_frame_pool);
@@ -147,35 +147,25 @@ void CAN_Channel::disable(list_head *plist_to_host, list_head *plist_frame_pool)
 }
 
 void CAN_Channel::CAN_SendFrame(list_head *plist_to_host) {
-	const bool was_irq_enabled = disable_irq();
-	gs_host_frame_object *frame_object =
-		list_first_entry_or_null(&list_from_host, struct gs_host_frame_object, list);
-
-	if (!frame_object) {
-		restore_irq(was_irq_enabled);
-		return;
+	static bool datain_request = false;
+	gs_host_frame_object rx_frame{};
+	if (!datain_request && xQueueReceive(xQueue_from_host, rx_frame._buf, 0) == pdPASS) {
+		datain_request = true;
+		led.blink_request(signal_led::LED_TX);
 	}
-
-	list_del(&frame_object->list);
-	restore_irq(was_irq_enabled);
-
-	gs_host_frame *frame = &frame_object->frame;
-
-	if (!can_send(frame)) {
-		list_add_locked(&frame_object->list, &list_from_host);
-		return;
+	if (datain_request == true) {
+		if (can_send(&rx_frame.frame)) {
+			datain_request = false;
+		}
 	}
-
 	// Echo sent frame back to host
-	frame->reserved = 0x0;
-	if (IS_ENABLED(CONFIG_CANFD) && frame->flags & GS_CAN_FLAG_FD)
-		frame->canfd_ts->timestamp_us = timer_get();
+	rx_frame.frame.reserved = 0x0;
+	if (IS_ENABLED(CONFIG_CANFD) && rx_frame.frame.flags & GS_CAN_FLAG_FD)
+		rx_frame.frame.canfd_ts->timestamp_us = timer_get();
 	else
-		frame->classic_can_ts->timestamp_us = timer_get();
-
-	list_add_tail_locked(&frame_object->list, plist_to_host);
-
-	led.blink_request(signal_led::LED_TX);
+		rx_frame.frame.classic_can_ts->timestamp_us = timer_get();
+	// TODO: 返回给上位机
+	// list_add_tail_locked(&frame_object->list, plist_to_host);
 }
 
 void CAN_Channel::CAN_HandleError(list_head *plist_to_host, list_head *plist_frame_pool) {

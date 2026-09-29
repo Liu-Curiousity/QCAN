@@ -322,7 +322,9 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epn
 
     bool was_irq_enabled = disable_irq();
     // Enqueue the frame we just received.
-    list_add_tail(&from_host_buf[0]->list, &channel->list_from_host);
+    // TODO: 未处理溢出
+    xQueueSendToBack(channel->xQueue_from_host, &from_host_buf[0]->_buf, 0);
+    list_add_tail(&from_host_buf[0]->list, &list_frame_pool);
 
     int last;
     for (last = 0; last < (int)ARRAY_SIZE(from_host_buf) - 1; ++last)
@@ -455,41 +457,6 @@ uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *fr
 
     return USBD_GS_CAN_Transmit(pdev, send_addr, len);
 }
-
-// void USBD_GS_CAN_SendToHost(USBD_HandleTypeDef *pdev) {
-//     bool was_irq_enabled = disable_irq();
-//     if (hGS_CAN.to_host_buf) {
-//         restore_irq(was_irq_enabled);
-//         return;
-//     }
-//
-//     hGS_CAN.to_host_buf =
-//         list_first_entry_or_null(&hGS_CAN.list_to_host, struct gs_host_frame_object, list);
-//     if (!hGS_CAN.to_host_buf) {
-//         restore_irq(was_irq_enabled);
-//         return;
-//     }
-//
-//     list_del(&hGS_CAN.to_host_buf->list);
-//     restore_irq(was_irq_enabled);
-//
-//     if (USBD_GS_CAN_SendFrame(pdev, hGS_CAN.to_host_buf) == USBD_OK)
-//         return;
-//
-//     /*
-//      * If USBD_GS_CAN_SendFrame() fails, it will be due to a USB suspend event
-//      * (is_usb_suspend_cb == true).
-//      * For now the firmware shuts down the CAN interface during suspend and
-//      * hcan->to_host_buf is pruged by usbd_gs_can_purge_to_host_buf() during
-//      * USBD_GS_CAN_DeInit().
-//      */
-//     was_irq_enabled = disable_irq();
-//     if (hGS_CAN.to_host_buf) {
-//         list_add_tail(&hGS_CAN.to_host_buf->list, &hGS_CAN.list_frame_pool);
-//         hGS_CAN.to_host_buf = nullptr;
-//     }
-//     restore_irq(was_irq_enabled);
-// }
 
 // Handle USB suspend event
 void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev) {
