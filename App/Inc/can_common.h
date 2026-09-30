@@ -26,8 +26,6 @@
 
 #pragma once
 
-#include "compiler.h"
-
 #define CAN_ERROR_WARNING_THRESHOLD	 96
 #define CAN_ERROR_PASSIVE_THRESHOLD	 128
 #define CAN_BUS_OFF_THRESHOLD		 256
@@ -66,7 +64,7 @@ public:
     uint32_t feature{};
     uint8_t nr;
 
-    virtual void get_device_state(gs_device_state *state) = 0;
+    void get_device_state(gs_device_state *state) const;
 
     bool set_bittiming(const gs_device_bittiming *timing);
 
@@ -74,7 +72,7 @@ public:
 
     [[nodiscard]] bool is_enabled() const;
 
-    bool enable(uint32_t feature_);
+    bool enable(uint32_t feature);
 
     void disable();
 
@@ -83,9 +81,9 @@ public:
     void CAN_HandleError(xQueueHandle xQueue_to_host);
 
 protected:
-    uint8_t tx_error_count;
-    uint8_t rx_error_count;
-    bool error_pending;
+    uint8_t tx_error_count{};
+    uint8_t rx_error_count{};
+    bool error_pending{};
     gs_device_bittiming bittiming{};
     gs_device_bittiming data_bittiming{};
 
@@ -98,40 +96,19 @@ private:
 
     virtual void drv_enable() = 0;
     virtual void drv_disable() = 0;
-    virtual bool is_rx_pending() = 0;
-    virtual bool can_send(gs_host_frame *frame) = 0;
-    virtual gs_can_state drv_get_state() = 0;
-    virtual void can_drv_handle_bus_error(gs_host_frame *frame) = 0;
-    virtual void can_drv_handle_bus_off_recovery() = 0;
-    virtual void can_drv_read_reg_status() = 0;
+    virtual bool drv_is_rx_pending() = 0;
+    virtual bool drv_send(gs_host_frame *frame) = 0;
+    virtual void drv_handle_bus_error(gs_host_frame *frame) = 0;
+    virtual void drv_handle_bus_off_recovery() = 0;
+    virtual gs_can_state drv_read_status() = 0;
 
     static bool check_bittiming_ok(const can_bittiming_const *btc, const gs_device_bittiming *timing);
+
+    uint8_t controller_error_flags() const;
 
     void schedule_bus_off_recovery(uint32_t delay_ms);
 
     bool bus_off_recovery_pending() const;
-
-    uint8_t tx_state_to_frame(const uint16_t err) {
-        if (err < CAN_ERROR_WARNING_THRESHOLD)
-            return CAN_ERR_CRTL_ACTIVE;
-        if (err < CAN_ERROR_PASSIVE_THRESHOLD)
-            return CAN_ERR_CRTL_TX_WARNING;
-        if (err < CAN_BUS_OFF_THRESHOLD)
-            return CAN_ERR_CRTL_TX_PASSIVE;
-
-        return CAN_ERR_CRTL_UNSPEC;
-    }
-
-    uint8_t rx_state_to_frame(const uint16_t err) {
-        if (err < CAN_ERROR_WARNING_THRESHOLD)
-            return CAN_ERR_CRTL_ACTIVE;
-        if (err < CAN_ERROR_PASSIVE_THRESHOLD)
-            return CAN_ERR_CRTL_RX_WARNING;
-        if (err < CAN_BUS_OFF_THRESHOLD)
-            return CAN_ERR_CRTL_RX_PASSIVE;
-
-        return CAN_ERR_CRTL_UNSPEC;
-    }
 };
 
 #endif

@@ -13,6 +13,7 @@
 #ifndef QCAN_USBD_GS_USB_H
 #define QCAN_USBD_GS_USB_H
 
+#include "config.h"
 #include "usbd_def.h"
 #include "bxcan.h"
 
