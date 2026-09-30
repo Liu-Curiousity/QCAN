@@ -33,7 +33,7 @@
 
 class bxcan_ : public CAN_Channel {
 public:
-    bxcan_(CAN_HandleTypeDef *hcan, const uint8_t nr) : CAN_Channel(nr), hcan(hcan) {}
+    bxcan_(const uint8_t nr, CAN_HandleTypeDef *hcan, const signal_led& led) : CAN_Channel(nr, led), hcan(hcan) {}
 
 private:
     constexpr static auto CAN_LEC_NO_ERROR = 0;

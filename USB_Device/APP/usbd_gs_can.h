@@ -35,10 +35,6 @@ public:
     explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
         channels(&channels), channel_count(1), sof_timestamp_us(0) {
         xQueue_to_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
-
-        for (std::size_t i = 0; i < channel_count; ++i) {
-            this->channels[i].disable();
-        }
     }
 
     union ep0 {

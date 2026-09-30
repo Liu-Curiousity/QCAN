@@ -109,8 +109,3 @@ public:
 private:
     blink_led leds[LED_MAX];
 };
-
-inline signal_led led{
-    {LED_RX_GPIO_Port, LED_RX_Pin, true},
-    {LED_TX_GPIO_Port, LED_TX_Pin, true}
-};

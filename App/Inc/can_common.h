@@ -39,6 +39,7 @@
 #endif
 
 #include "gs_usb.h"
+#include "led.h"
 #include "FreeRTOS.h"
 #include "queue.h"
 
@@ -56,13 +57,14 @@ class CAN_Channel {
 public:
     virtual ~CAN_Channel() = default;
 
-    CAN_Channel(const uint8_t nr) : nr(nr) {
+    CAN_Channel(const uint8_t nr, const signal_led& led) : nr(nr), led(led) {
         xQueue_from_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
     }
 
     xQueueHandle xQueue_from_host; // 待发送到CAN总线的帧队列
     uint32_t feature{};
     uint8_t nr;
+    signal_led led;
 
     void get_device_state(gs_device_state *state) const;
 
@@ -91,7 +93,7 @@ private:
     constexpr static uint32_t CAN_CHANNEL_BUS_OFF_RESTART_DISABLED = 0;
     constexpr static uint32_t CAN_BUS_OFF_RESTART_DELAY_MS = 100;
 
-    uint32_t bus_off_restart{};
+    uint32_t bus_off_restart{CAN_CHANNEL_BUS_OFF_RESTART_DISABLED};
     gs_can_state state{GS_CAN_STATE_STOPPED};
 
     virtual void drv_enable() = 0;

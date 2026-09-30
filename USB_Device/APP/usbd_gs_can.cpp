@@ -231,9 +231,9 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
         }
         case GS_USB_BREQ_IDENTIFY: {
             if (ep0.identify_mode.mode) {
-                led.mode = signal_led::Mode::CONTINUES;
+                channels[0].led.mode = signal_led::Mode::CONTINUES;
             } else {
-                led.mode = channel->is_enabled()? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
+                channels[0].led.mode = channel->is_enabled()? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
             }
             break;
         }

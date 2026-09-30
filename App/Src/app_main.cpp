@@ -13,8 +13,13 @@
 #include <cstring>
 
 extern USBD_COMPOSITE_HandleTypeDef hcomposite;
-bxcan_ can_data{&hcan, 0};
-USBD_GS_CAN_HandleTypeDef hGS_CAN{can_data};
+bxcan_ can_channel_0{
+    0, &hcan, signal_led{
+        {LED_RX_GPIO_Port, LED_RX_Pin, true},
+        {LED_TX_GPIO_Port, LED_TX_Pin, true}
+    }
+};
+USBD_GS_CAN_HandleTypeDef hGS_CAN{can_channel_0};
 static USBD_HandleTypeDef hUSB;
 
 uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object);
@@ -28,17 +33,12 @@ void StartDebugTask(void *argument) {
     USBD_Start(&hUSB);
     static bool datain_request = false;
     while (true) {
-        for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            hGS_CAN.channels[i].CAN_SendFrame();
-        }
-
         /*==========================从上位机接收帧============================*/
         USBD_GS_CAN_ReceiveFromHost(&hUSB);
 
         /*==========================向上位机发送帧============================*/
         if (!datain_request && xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) == pdPASS) {
             datain_request = true;
-            led.blink_request(signal_led::LED_RX);
         }
         if (datain_request == true) {
             if (USBD_GS_CAN_SendFrame(&hUSB, &rx_frame) == USBD_OK) {
@@ -47,8 +47,9 @@ void StartDebugTask(void *argument) {
         }
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
+            hGS_CAN.channels[i].CAN_SendFrame();
             hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.xQueue_to_host);
-            led.update();
+            hGS_CAN.channels[i].led.update();
         }
     }
 }
@@ -70,8 +71,9 @@ extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
             rx_frame.can_id = rx_header.IDE == CAN_ID_EXT ? rx_header.ExtId : rx_header.StdId;
             if (rx_header.IDE == CAN_ID_EXT) rx_frame.can_id |= CAN_EFF_FLAG;
             if (rx_header.RTR == CAN_RTR_REMOTE) rx_frame.can_id |= CAN_RTR_FLAG;
-            rx_frame.channel = can_data.nr;
+            rx_frame.channel = can_channel_0.nr;
             rx_frame.flags = queue_overflow ? GS_CAN_FLAG_OVERFLOW : 0;
+            can_channel_0.led.blink_request(signal_led::LED_RX);
 
             queue_overflow = xQueueSendToBackFromISR(hGS_CAN.xQueue_to_host, rx_object._buf, &xHigherPriorityTaskWoken) != pdPASS;
         }
