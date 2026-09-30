@@ -11,21 +11,12 @@
 extern USBD_GS_CAN_HandleTypeDef hGS_CAN;
 
 uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) {
-    gs_host_frame *frame = &from_host_buf.frame;
-    uint16_t size;
-
-    if (IS_ENABLED(CONFIG_CANFD)) {
-        size = struct_size(frame, canfd_ts, 1);
-    } else {
-        size = struct_size(frame, classic_can_ts, 1);
-    }
-
-    return USBD_LL_PrepareReceive(pdev, GSUSB_ENDPOINT_OUT, (uint8_t *)frame, size);
-}
-
-uint8_t USBD_GS_CAN_HandleTypeDef::out_prepare_receive(USBD_HandleTypeDef *pdev) {
-    PrepareReceive(pdev);
-    return USBD_OK;
+    return USBD_LL_PrepareReceive(
+        pdev,
+        GSUSB_ENDPOINT_OUT,
+        reinterpret_cast<uint8_t *>(&from_host_buf.frame),
+        struct_size(&from_host_buf.frame, canfd_ts, 1)
+    );
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
@@ -37,8 +28,6 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
-    // 1. purge to_host_buf
-    is_usb_suspend_cb = false;
     USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
     USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_OUT);
     return USBD_OK;
@@ -51,16 +40,6 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReq
     const void *src = nullptr;
     size_t len;
 
-    /*
-     * For all "per device" USB control messages
-     * (GS_USB_BREQ_HOST_FORMAT and GS_USB_BREQ_DEVICE_CONFIG) the
-     * Linux gs_usb driver uses a req->wValue = 1.
-     *
-     * All other control messages are "per channel" and specify the
-     * channel number in req->wValue. So check req->wValue for valid
-     * CAN channel.
-     *
-     */
     if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
         channel = GetChannel(req->wValue);
         if (!channel) {
@@ -180,12 +159,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
 
     CAN_Channel *channel = nullptr;
     USBD_SetupReqTypedef *req = &last_setup_request;
-    /*
-     * The control messages GS_USB_BREQ_HOST_FORMAT and
-     * GS_USB_BREQ_DEVICE_CONFIG are per device, all others are per
-     * channel. The validity of req->wValue has been checked in
-     * USBD_GS_CAN_Config_Request() already.
-     */
+
     if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
         channel = GetChannel(req->wValue);
         if (!channel) {
@@ -263,13 +237,6 @@ out_fail:
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
-    if (epnum != (GSUSB_ENDPOINT_IN & 0x7F)) return USBD_OK;
-
-    // const bool was_irq_enabled = disable_irq();
-    // list_add_tail(&to_host_buf->list, &list_frame_pool);
-    // to_host_buf = nullptr;
-    // restore_irq(was_irq_enabled);
-
     return USBD_OK;
 }
 
@@ -277,23 +244,23 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnu
 uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != GSUSB_ENDPOINT_OUT) return USBD_OK;
 
-
     uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
-    if (rxlen < (struct_size(&from_host_buf.frame, classic_can, 1))) {
-        // Invalid frame length, just ignore it and receive into the same buffer
-        // again next time.
-        return out_prepare_receive(pdev);
+    if (rxlen < struct_size(&from_host_buf.frame, classic_can, 1)) {
+        PrepareReceive(pdev);
+        return USBD_OK;
     }
 
     CAN_Channel *channel = GetChannel(from_host_buf.frame.channel);
     if (!channel) {
-        return out_prepare_receive(pdev);
+        PrepareReceive(pdev);
+        return USBD_OK;
     }
 
     if (IS_ENABLED(CONFIG_CANFD) &&
         from_host_buf.frame.flags & GS_CAN_FLAG_FD &&
         rxlen < struct_size(&from_host_buf.frame, canfd, 1)) {
-        return out_prepare_receive(pdev);
+        PrepareReceive(pdev);
+        return USBD_OK;
     }
 
     // Enqueue the frame we just received.
@@ -320,17 +287,6 @@ uint8_t USBD_GS_CAN_HandleTypeDef::SOF(USBD_HandleTypeDef *pdev) {
     sof_timestamp_us = timer_get();
     return USBD_OK;
 }
-
-/*
- * It's unclear from the documentation, but it appears that the USB library is
- * not safely reentrant. It attempts to signal errors via return values if it is
- * reentered, but that code is not interrupt-safe and the error values are
- * silently ignored within the library in several cases. We'll just disable
- * interrupts at all entry points to be safe. Note that the callbacks are all
- * called from within the library itself, either within the interrupt handler or
- * within other calls, which means the USB interrupt is already disabled and we
- * don't have any other interrupts to worry about.
- */
 
 USBD_ClassTypeDef USBD_GS_CAN = {
     .Init = [](USBD_HandleTypeDef *pdev, uint8_t cfgidx) -> uint8_t {
@@ -361,17 +317,24 @@ void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev) {
 }
 
 static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t len) {
-    if (false == hGS_CAN.is_usb_suspend_cb) {
+    if (pdev->dev_state == USBD_STATE_CONFIGURED) {
         USBD_LL_Transmit(pdev, GSUSB_ENDPOINT_IN, buf, len);
         return USBD_OK;
-    } else {
-        return USBD_BUSY;
     }
+    return USBD_FAIL;
 }
 
-uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object) {
-    const CAN_Channel *channel = &hGS_CAN.channels[frame_object->frame.channel];
-    const gs_host_frame *frame = &frame_object->frame;
+void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
+    static bool datain_request = false;
+    static gs_host_frame_object rx_frame{};
+
+    if (!datain_request && xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) == pdPASS) {
+        datain_request = true;
+    }
+    if (datain_request == false) return;
+
+    const CAN_Channel *channel = &hGS_CAN.channels[rx_frame.frame.channel];
+    const gs_host_frame *frame = &rx_frame.frame;
     static uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];
     uint8_t *send_addr = (uint8_t *)frame;
     size_t len;
@@ -411,21 +374,7 @@ uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *fr
         len = sizeof(buf);
     }
 
-    return USBD_GS_CAN_Transmit(pdev, send_addr, len);
-}
-
-// Handle USB suspend event
-void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev) {
-    // Disable CAN and go off bus on USB suspend
-    for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-        CAN_Channel *channel = &hGS_CAN.channels[i];
-
-        channel->disable();
+    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) == USBD_OK) {
+        datain_request = false;
     }
-
-    hGS_CAN.is_usb_suspend_cb = true;
-}
-
-void USBD_GS_CAN_ResumeCallback(USBD_HandleTypeDef __maybe_unused *pdev) {
-    hGS_CAN.is_usb_suspend_cb = false;
 }

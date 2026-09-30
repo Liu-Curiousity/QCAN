@@ -74,15 +74,12 @@ public:
     size_t channel_count{};
 
     uint32_t sof_timestamp_us;
-    volatile bool is_usb_suspend_cb{};
 
     [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
         return ch < channel_count ? &channels[ch] : nullptr;
     }
 
     uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
-
-    uint8_t out_prepare_receive(USBD_HandleTypeDef *pdev);
 
     uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
 
@@ -123,8 +120,6 @@ extern "C" {
 
 extern USBD_ClassTypeDef USBD_GS_CAN;
 
-void USBD_GS_CAN_SuspendCallback(USBD_HandleTypeDef *pdev);
-void USBD_GS_CAN_ResumeCallback(USBD_HandleTypeDef *pdev);
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
 bool USBD_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 bool USBD_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);

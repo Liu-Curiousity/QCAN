@@ -198,7 +198,7 @@ void HAL_PCD_SuspendCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
   /* USER CODE BEGIN HAL_PCD_SuspendCallback_PreTreatment */
-  USBD_GS_CAN_SuspendCallback(hpcd->pData);
+
   /* USER CODE END HAL_PCD_SuspendCallback_PreTreatment */
   /* Inform USB library that core enters in suspend Mode. */
   USBD_LL_Suspend((USBD_HandleTypeDef*)hpcd->pData);
@@ -242,7 +242,7 @@ void HAL_PCD_ResumeCallback(PCD_HandleTypeDef *hpcd)
 
   USBD_LL_Resume((USBD_HandleTypeDef*)hpcd->pData);
   /* USER CODE BEGIN HAL_PCD_ResumeCallback_PostTreatment */
-  USBD_GS_CAN_ResumeCallback(hpcd->pData);
+
   /* USER CODE END HAL_PCD_ResumeCallback_PostTreatment */
 }
 

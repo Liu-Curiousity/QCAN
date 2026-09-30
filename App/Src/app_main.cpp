@@ -51,29 +51,19 @@ bxcan_ can_channel_0{
 USBD_GS_CAN_HandleTypeDef hGS_CAN{can_channel_0};
 static USBD_HandleTypeDef hUSB;
 
-uint8_t USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev, gs_host_frame_object *frame_object);
+void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev);
 
 void StartDebugTask(void *argument) {
-    gs_host_frame_object rx_frame{};
-
     USBD_Init(&hUSB, &FS_Desc, DEVICE_FS);
     USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
     hUSB.pClassData = &hcomposite;
     USBD_Start(&hUSB);
-    static bool datain_request = false;
     while (true) {
         /*==========================从上位机接收帧============================*/
         USBD_GS_CAN_ReceiveFromHost(&hUSB);
 
         /*==========================向上位机发送帧============================*/
-        if (!datain_request && xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) == pdPASS) {
-            datain_request = true;
-        }
-        if (datain_request == true) {
-            if (USBD_GS_CAN_SendFrame(&hUSB, &rx_frame) == USBD_OK) {
-                datain_request = false;
-            }
-        }
+        USBD_GS_CAN_SendFrame(&hUSB);
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
             hGS_CAN.channels[i].CAN_SendFrame();
