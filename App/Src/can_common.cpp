@@ -28,6 +28,7 @@
 #include "can_common.h"
 #include "led.h"
 #include "timer.h"
+#include "util.h"
 
 #ifndef CONFIG_CANFD
 const gs_device_bt_const_extended CAN_btconst_ext{};

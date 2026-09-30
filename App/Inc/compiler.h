@@ -32,9 +32,6 @@
 #ifndef _LINUXKPI_LINUX_COMPILER_H_
 #define _LINUXKPI_LINUX_COMPILER_H_
 
-#include "zephyr/sys/util.h"
-#include "zephyr/sys/util_macro.h"
-
 #ifndef __aligned
 #define __aligned(x) __attribute__((__aligned__(x)))
 #endif

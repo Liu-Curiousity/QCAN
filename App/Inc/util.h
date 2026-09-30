@@ -46,6 +46,35 @@
 // anyways, but trying to outsmart the compiler is a bad strategy (you never
 // know when somebody will turn on LTO or something).
 
+/** @brief Extract the Least Significant Bit from @p value. */
+#define LSB_GET(value) ((value) & -(value))
+/**
+ * @brief Extract a bitfield element from @p value corresponding to
+ *	  the field mask @p mask.
+ */
+#define FIELD_GET(mask, value) (((value) & (mask)) / LSB_GET(mask))
+/**
+ * @brief Prepare a bitfield element using @p value with @p mask representing
+ *	  its field position and width. The result should be combined
+ *	  with other fields using a logical OR.
+ */
+#define FIELD_PREP(mask, value) (((value) * LSB_GET(mask)) & (mask))
+
+/* Then we append an extra argument to fool the gcc preprocessor into
+ * accepting it as a varargs macro.
+ *                         arg1   arg2  arg3
+ *   ENABLED:   Z_IS_ENABLED3(_YYYY,    1,    0)
+ *   DISABLED   Z_IS_ENABLED3(_XXXX 1,  0)
+ */
+#define Z_IS_ENABLED2(one_or_two_args) Z_IS_ENABLED3(one_or_two_args 1, 0)
+
+/* And our second argument is thus now cooked to be 1 in the case
+ * where the value is defined to 1, and 0 if not:
+ */
+#define Z_IS_ENABLED3(ignore_this, val, ...) val
+
+#define IS_ENABLED(config_macro) Z_IS_ENABLED2(_XXXX ## config_macro)
+
 static inline bool is_irq_enabled(void)
 {
 	return (__get_PRIMASK() & 1u) == 0u; // interrupts not prevented

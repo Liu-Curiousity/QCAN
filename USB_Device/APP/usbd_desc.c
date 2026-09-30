@@ -22,7 +22,6 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "compiler.h"
 #include "config.h"
 #include "usbd_ctlreq.h"
 #include "usbd_desc.h"

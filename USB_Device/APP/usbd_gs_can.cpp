@@ -6,6 +6,7 @@
 #include "can_common.h"
 #include "timer.h"
 #include "led.h"
+#include "util.h"
 
 extern USBD_GS_CAN_HandleTypeDef hGS_CAN;
 
@@ -185,8 +186,12 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
      * channel. The validity of req->wValue has been checked in
      * USBD_GS_CAN_Config_Request() already.
      */
-    if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG))
+    if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
         channel = GetChannel(req->wValue);
+        if (!channel) {
+            goto out_fail;
+        }
+    }
 
     if (!IS_ENABLED(CONFIG_CANFD)) {
         switch (req->bRequest) {

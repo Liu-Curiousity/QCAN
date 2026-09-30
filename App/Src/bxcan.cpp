@@ -25,6 +25,7 @@
  */
 
 #include "bxcan.h"
+#include "util.h"
 
 void bxcan_::drv_enable() {
     HAL_CAN_DeInit(hcan);

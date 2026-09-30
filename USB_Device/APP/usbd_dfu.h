@@ -17,7 +17,6 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <usbd_def.h>
-#include "compiler.h"
 
 #define DFU_INTERFACE_NUM		 1
 #define DFU_INTERFACE_STR_INDEX	 0xE0
