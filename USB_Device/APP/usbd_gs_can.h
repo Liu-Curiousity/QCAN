@@ -41,6 +41,40 @@ public:
         vQueueDelete(xQueue_to_host);
     }
 
+    xQueueHandle xQueue_to_host; // 向主机发送帧的队列
+
+    CAN_Channel *channels;
+    size_t channel_count{};
+
+    [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
+        return ch < channel_count ? &channels[ch] : nullptr;
+    }
+
+    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
+
+    uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+
+    uint8_t DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+
+    uint8_t Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
+
+    uint8_t EP0_RxReady(USBD_HandleTypeDef *pdev);
+
+    uint8_t DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
+
+    uint8_t DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
+
+    uint8_t SOF(USBD_HandleTypeDef *pdev);
+
+    /* Composite control callbacks are broadcast. Only handle gs_usb vendor
+     * requests, retaining support for device-recipient requests. */
+    static bool IsRequest(const USBD_SetupReqTypedef *req) {
+        return (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_VENDOR &&
+               ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE ||
+                ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE && req->wIndex == 0));
+    }
+
+private:
     union ep0 {
         // Device -> Host
         gs_device_state state;
@@ -64,26 +98,9 @@ public:
         })];
     } ep0{};
 
-    USBD_SetupReqTypedef last_setup_request{};
-
-    xQueueHandle xQueue_to_host; // 向主机发送帧的队列
-
-    gs_host_frame_object from_host_buf{}; // 从主机接收到帧后使用的双缓冲指针
-
-    CAN_Channel *channels;
-    size_t channel_count{};
-
     uint32_t sof_timestamp_us;
-
-    [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
-        return ch < channel_count ? &channels[ch] : nullptr;
-    }
-
-    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
-
-    uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
-
-    uint8_t DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+    USBD_SetupReqTypedef last_setup_request{};
+    gs_host_frame_object from_host_buf{}; // 从主机接收到帧后使用的双缓冲指针
 
     // device info
     const gs_device_config USBD_GS_CAN_dconf = {
@@ -91,26 +108,6 @@ public:
         .sw_version = 2,
         .hw_version = 1,
     };
-
-    uint8_t Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
-
-    uint8_t EP0_RxReady(USBD_HandleTypeDef *pdev);
-
-    uint8_t DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
-
-    uint8_t DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
-
-    uint8_t SOF(USBD_HandleTypeDef *pdev);
-
-    /* Composite control callbacks are broadcast. Only handle gs_usb vendor
-     * requests, retaining support for device-recipient requests. */
-    static bool IsRequest(const USBD_SetupReqTypedef *req) {
-        return (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_VENDOR &&
-               ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE ||
-                ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE && req->wIndex == 0));
-    }
-
-private:
 } __attribute__ ((aligned (4)));
 
 extern "C" {
