@@ -37,6 +37,10 @@ public:
         xQueue_to_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
     }
 
+    ~USBD_GS_CAN_HandleTypeDef() {
+        vQueueDelete(xQueue_to_host);
+    }
+
     union ep0 {
         // Device -> Host
         gs_device_state state;

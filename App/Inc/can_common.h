@@ -55,7 +55,9 @@ struct gs_host_frame_object {
 
 class CAN_Channel {
 public:
-    virtual ~CAN_Channel() = default;
+    virtual ~CAN_Channel() {
+        vQueueDelete(xQueue_from_host);
+    };
 
     CAN_Channel(const uint8_t nr, const signal_led& led) : nr(nr), led(led) {
         xQueue_from_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
