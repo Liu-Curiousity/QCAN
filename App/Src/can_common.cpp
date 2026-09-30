@@ -33,8 +33,6 @@
 const gs_device_bt_const_extended CAN_btconst_ext{};
 #endif
 
-#define CAN_CHANNEL_BUS_OFF_RESTART_DISABLED 0
-
 const gs_device_bt_const CAN_btconst = {
 	.feature =
 		GS_CAN_FEATURE_LISTEN_ONLY |
@@ -76,13 +74,6 @@ bool CAN_Channel::check_bittiming_ok(const can_bittiming_const *btc, const gs_de
 	return true;
 }
 
-void CAN_Channel::can_schedule_bus_off_recovery(const uint32_t delay_ms) {
-	bus_off_restart = HAL_GetTick() + delay_ms;
-
-	if (bus_off_restart == CAN_CHANNEL_BUS_OFF_RESTART_DISABLED)
-		bus_off_restart++;
-}
-
 bool CAN_Channel::set_bittiming(const gs_device_bittiming *timing) {
 	if (!check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
 	bittiming = *timing;
@@ -105,8 +96,8 @@ bool CAN_Channel::is_enabled() const {
 bool CAN_Channel::enable(const uint32_t feature_) {
 	xQueueReset(xQueue_from_host);
 	led.mode = signal_led::Mode::NORMAL;
-	feature = feature_;
 	state = GS_CAN_STATE_ERROR_ACTIVE;
+	feature = feature_;
 	drv_enable();
 	return true;
 }
@@ -116,7 +107,6 @@ void CAN_Channel::disable() {
 	bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
 	state = GS_CAN_STATE_STOPPED;
 	feature = 0;
-
 	led.mode = signal_led::Mode::OFF;
 }
 
@@ -145,105 +135,55 @@ void CAN_Channel::CAN_SendFrame() {
 void CAN_Channel::CAN_HandleError(xQueueHandle xQueue_to_host) {
 	if (is_rx_pending()) return;
 
+	gs_host_frame_object frame_object{
+		.frame = {
+			.echo_id = GS_HOST_FRAME_ECHO_ID_RX,
+			.can_id = CAN_ERR_FLAG,
+			.can_dlc = CAN_ERR_DLC,
+			.channel = nr,
+		}
+	};
+	frame_object.frame.classic_can_ts->timestamp_us = timer_get();
+	gs_host_frame *frame = &frame_object.frame;
+
 	can_drv_read_reg_status();
 
-	if (can_state_change_pending()) {
-		can_handle_state_change(xQueue_to_host);
-	} else if (can_bus_error_pending()) {
-		can_handle_bus_error(xQueue_to_host);
-	} else if (can_bus_off_recovery_pending()) {
-		can_handle_bus_off_recovery(xQueue_to_host);
-	}
-}
-
-bool CAN_Channel::can_is_lec_error(const uint8_t lec) {
-	if (lec == CAN_LEC_NO_ERROR || lec == CAN_LEC_SOFTWARE)
-		return false;
-
-	return true;
-}
-
-bool CAN_Channel::can_state_change_pending() {
-	if (!is_enabled()) return false;
-
 	const gs_can_state new_state = drv_get_state();
-	if (state == new_state) return false;
-
-	state = new_state;
-
-	return true;
-}
-
-
-void CAN_Channel::can_handle_state_change(xQueueHandle xQueue_to_host) {
-	gs_host_frame_object frame_object;
-
-	gs_host_frame *frame = &frame_object.frame;
-	can_prepare_error_frame(frame);
-
-	if (state == GS_CAN_STATE_BUS_OFF) {
-		frame->can_id |= CAN_ERR_BUSOFF;
-
-		/* host is not taking care of CAN bus of recovery */
-		can_schedule_bus_off_recovery(CAN_BUS_OFF_RESTART_DELAY_MS);
-	} else {
-		frame->can_id |= CAN_ERR_CRTL | CAN_ERR_CNT;
-		can_drv_handle_state_change(frame);
+	if (is_enabled() && state != new_state) {
+		state = new_state;
+		if (state == GS_CAN_STATE_BUS_OFF) {
+			frame->can_id |= CAN_ERR_BUSOFF;
+			schedule_bus_off_recovery(CAN_BUS_OFF_RESTART_DELAY_MS);
+		} else {
+			frame->can_id |= CAN_ERR_CRTL;
+			frame->classic_can->data[1] |=
+				tx_error_count > rx_error_count ? tx_state_to_frame(tx_error_count) : rx_state_to_frame(rx_error_count);
+			can_drv_handle_bus_error(frame);
+		}
+		xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
+	} else if (feature & GS_CAN_FEATURE_BERR_REPORTING && error_pending) {
 		can_drv_handle_bus_error(frame);
-	}
-	xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
-}
-
-void CAN_Channel::can_prepare_error_frame(gs_host_frame *frame) const {
-	frame->echo_id = GS_HOST_FRAME_ECHO_ID_RX;
-	frame->can_id = CAN_ERR_FLAG;
-	frame->can_dlc = CAN_ERR_DLC;
-	frame->channel = nr;
-	frame->flags = 0;
-	frame->reserved = 0;
-	*frame->classic_can = classic_can{};
-
-	frame->classic_can_ts->timestamp_us = timer_get();
-}
-
-bool CAN_Channel::can_bus_error_pending() {
-	if (!(feature & GS_CAN_FEATURE_BERR_REPORTING))
-		return false;
-
-	return can_drv_bus_error_pending();
-}
-
-void CAN_Channel::can_handle_bus_error(xQueueHandle xQueue_to_host) {
-	gs_host_frame_object frame_object{};
-
-	gs_host_frame *frame = &frame_object.frame;
-
-	can_prepare_error_frame(frame);
-	if (can_drv_handle_bus_error(frame)) {
+		xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
+	} else if (bus_off_recovery_pending()) {
+		can_drv_handle_bus_off_recovery();
+		bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
+		frame->can_id |= CAN_ERR_RESTARTED;
 		xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
 	}
 }
 
-bool CAN_Channel::can_bus_off_recovery_pending() const {
+void CAN_Channel::schedule_bus_off_recovery(const uint32_t delay_ms) {
+	bus_off_restart = HAL_GetTick() + delay_ms;
+
+	if (bus_off_restart == CAN_CHANNEL_BUS_OFF_RESTART_DISABLED)
+		bus_off_restart++;
+}
+
+bool CAN_Channel::bus_off_recovery_pending() const {
 	if (bus_off_restart == CAN_CHANNEL_BUS_OFF_RESTART_DISABLED)
 		return false;
 
 	const uint32_t now = HAL_GetTick();
 
 	return static_cast<int32_t>(now - bus_off_restart) >= 0;
-}
-
-void CAN_Channel::can_handle_bus_off_recovery(xQueueHandle xQueue_to_host) {
-	can_drv_handle_bus_off_recovery();
-
-	bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
-
-	gs_host_frame_object frame_object{};
-
-	gs_host_frame *frame = &frame_object.frame;
-	can_prepare_error_frame(frame);
-
-	frame->can_id |= CAN_ERR_RESTARTED;
-
-	xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
 }

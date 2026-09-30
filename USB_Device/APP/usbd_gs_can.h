@@ -36,7 +36,6 @@ public:
         xQueue_to_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
 
         for (std::size_t i = 0; i < channel_count; ++i) {
-            this->channels[i].nr = i;
             this->channels[i].disable();
         }
     }

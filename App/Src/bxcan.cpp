@@ -95,40 +95,45 @@ bool bxcan_::can_send(gs_host_frame *frame) {
 	return status == HAL_OK ? true : false;
 }
 
-bool bxcan_::can_drv_bus_error_pending() {
-	const uint32_t reg_esr = reg_status.esr;
-	const uint8_t lec = FIELD_GET(CAN_ESR_LEC, reg_esr);
-
-	return can_is_lec_error(lec);
-}
-
 void bxcan_::can_drv_read_reg_status() {
 	reg_status.esr = hcan->Instance->ESR;
 
-	if (can_drv_bus_error_pending()) {
-		/* mark as handled by software */
-		hcan->Instance->ESR |= FIELD_PREP(CAN_ESR_LEC, CAN_LEC_SOFTWARE);
-	}
+	rx_error_count = FIELD_GET(CAN_ESR_REC, reg_status.esr);
+	tx_error_count = FIELD_GET(CAN_ESR_TEC, reg_status.esr);
+	const uint8_t lec = FIELD_GET(CAN_ESR_LEC, reg_status.esr);
+	error_pending = lec != CAN_LEC_NO_ERROR && lec != CAN_LEC_SOFTWARE;
+
+	if (error_pending) hcan->Instance->ESR |= FIELD_PREP(CAN_ESR_LEC, CAN_LEC_SOFTWARE);
 }
 
-bool bxcan_::can_drv_handle_bus_error(gs_host_frame *frame) {
-	const uint32_t reg_esr = reg_status.esr;
-
-	const uint8_t tx_err = FIELD_GET(CAN_ESR_TEC, reg_esr);
-	const uint8_t rx_err = FIELD_GET(CAN_ESR_REC, reg_esr);
-
-	if (tx_err == 0 && rx_err == 0) {
-		return false;
-	}
-
-	frame->classic_can->data[6] = tx_err;
-	frame->classic_can->data[7] = rx_err;
+void bxcan_::can_drv_handle_bus_error(gs_host_frame *frame) {
+	frame->classic_can->data[6] = tx_error_count;
+	frame->classic_can->data[7] = rx_error_count;
 
 	frame->can_id |= CAN_ERR_PROT | CAN_ERR_BUSERROR | CAN_ERR_CNT;
 
-	can_lec_error_to_frame(frame, FIELD_GET(CAN_ESR_LEC, reg_esr));
-
-	return true;
+	switch (FIELD_GET(CAN_ESR_LEC, reg_status.esr)) {
+		case CAN_LEC_STUFF_ERROR:
+			frame->classic_can->data[2] |= CAN_ERR_PROT_STUFF;
+			break;
+		case CAN_LEC_FORM_ERROR:
+			frame->classic_can->data[2] |= CAN_ERR_PROT_FORM;
+			break;
+		case CAN_LEC_ACK_ERROR:
+			frame->can_id |= CAN_ERR_ACK;
+			break;
+		case CAN_LEC_REC_ERROR:
+			frame->classic_can->data[2] |= CAN_ERR_PROT_BIT1;
+			break;
+		case CAN_LEC_DOM_ERROR:
+			frame->classic_can->data[2] |= CAN_ERR_PROT_BIT0;
+			break;
+		case CAN_LEC_CRC_ERROR:
+			frame->classic_can->data[3] |= CAN_ERR_PROT_LOC_CRC_SEQ;
+			break;
+		default:
+			break;
+	}
 }
 
 gs_can_state bxcan_::drv_get_state() {
@@ -149,33 +154,13 @@ gs_can_state bxcan_::drv_get_state() {
 	return GS_CAN_STATE_ERROR_WARNING;
 }
 
-void bxcan_::can_drv_handle_state_change(gs_host_frame *frame) {
-	const uint32_t reg_esr = reg_status.esr;
-
-	const uint8_t tx_err = FIELD_GET(CAN_ESR_TEC, reg_esr);
-	const uint8_t rx_err = FIELD_GET(CAN_ESR_REC, reg_esr);
-
-	const gs_can_state tx_state = err_to_state(tx_err);
-	const gs_can_state rx_state = err_to_state(rx_err);
-
-	if (tx_state >= rx_state) {
-		frame->classic_can->data[1] |= gs_can_tx_state_to_frame(tx_state);
-	}
-
-	if (tx_state <= rx_state) {
-		frame->classic_can->data[1] |= gs_can_rx_state_to_frame(rx_state);
-	}
-}
-
 void bxcan_::can_drv_handle_bus_off_recovery() {
 	drv_disable();
 	drv_enable();
 }
 
 void bxcan_::get_device_state(gs_device_state *state) {
-	const uint32_t reg_esr = reg_status.esr;
-
 	state->state = drv_get_state();
-	state->rxerr = FIELD_GET(CAN_ESR_REC, reg_esr);
-	state->txerr = FIELD_GET(CAN_ESR_TEC, reg_esr);
+	state->rxerr = rx_error_count;
+	state->txerr = tx_error_count;
 }
