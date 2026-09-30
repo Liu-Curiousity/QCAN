@@ -70,7 +70,6 @@ public:
 
     gs_host_frame_object from_host_buf{}; // 从主机接收到帧后使用的双缓冲指针
 
-    // can_data_t *channels;
     CAN_Channel *channels;
     size_t channel_count{};
 

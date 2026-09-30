@@ -96,8 +96,8 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReq
             len = sizeof(ep0.mode);
             break;
         case GS_USB_BREQ_BT_CONST:
-            src = &CAN_btconst;
-            len = sizeof(CAN_btconst);
+            src = &channel->bt_const;
+            len = sizeof(channel->bt_const);
             break;
         case GS_USB_BREQ_DEVICE_CONFIG:
             src = &USBD_GS_CAN_dconf;
@@ -114,8 +114,8 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReq
             len = sizeof(ep0.bittiming);
             break;
         case GS_USB_BREQ_BT_CONST_EXT:
-            src = &CAN_btconst_ext;
-            len = sizeof(CAN_btconst_ext);
+            src = &channel->bt_const_ext;
+            len = sizeof(channel->bt_const_ext);
             break;
         case GS_USB_BREQ_SET_TERMINATION:
             len = sizeof(ep0.term_state);
@@ -127,7 +127,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReq
             len = sizeof(ep0.term_state);
             break;
         case GS_USB_BREQ_GET_STATE:
-            channel->get_device_state(&ep0.state);
+            ep0.state = channel->get_device_state();
             src = &ep0.state;
             len = sizeof(ep0.state);
             break;
@@ -236,9 +236,9 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
         }
         case GS_USB_BREQ_IDENTIFY: {
             if (ep0.identify_mode.mode) {
-                channels[0].led.mode = signal_led::Mode::CONTINUES;
+                channel->led.mode = signal_led::Mode::CONTINUES;
             } else {
-                channels[0].led.mode = channel->is_enabled()? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
+                channel->led.mode = channel->is_enabled() ? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
             }
             break;
         }

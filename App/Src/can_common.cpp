@@ -30,36 +30,6 @@
 #include "timer.h"
 #include "util.h"
 
-#ifndef CONFIG_CANFD
-const gs_device_bt_const_extended CAN_btconst_ext{};
-#endif
-
-const gs_device_bt_const CAN_btconst = {
-    .feature =
-    GS_CAN_FEATURE_LISTEN_ONLY |
-    GS_CAN_FEATURE_LOOP_BACK |
-    GS_CAN_FEATURE_ONE_SHOT |
-    GS_CAN_FEATURE_HW_TIMESTAMP |
-    GS_CAN_FEATURE_IDENTIFY |
-    GS_CAN_FEATURE_PAD_PKTS_TO_MAX_PKT_SIZE |
-    (IS_ENABLED(CONFIG_TERMINATION) ?
-     GS_CAN_FEATURE_TERMINATION : 0) |
-    GS_CAN_FEATURE_BERR_REPORTING |
-    GS_CAN_FEATURE_GET_STATE |
-    0,
-    .fclk_can = CAN_CLOCK_SPEED,
-    .btc = {
-        .tseg1_min = 1,
-        .tseg1_max = 16,
-        .tseg2_min = 1,
-        .tseg2_max = 8,
-        .sjw_max = 4,
-        .brp_min = 1,
-        .brp_max = 1024,
-        .brp_inc = 1,
-    },
-};
-
 bool CAN_Channel::check_bittiming_ok(const can_bittiming_const *btc, const gs_device_bittiming *timing) {
     const uint32_t tseg1 = timing->prop_seg + timing->phase_seg1;
 
@@ -75,20 +45,22 @@ bool CAN_Channel::check_bittiming_ok(const can_bittiming_const *btc, const gs_de
     return true;
 }
 
-void CAN_Channel::get_device_state(gs_device_state *state) const {
-    state->state = this->state;
-    state->rxerr = rx_error_count;
-    state->txerr = tx_error_count;
+gs_device_state CAN_Channel::get_device_state() const {
+    return gs_device_state{
+        .state = this->state,
+        .rxerr = rx_error_count,
+        .txerr = tx_error_count,
+    };
 }
 
 bool CAN_Channel::set_bittiming(const gs_device_bittiming *timing) {
-    if (!check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
+    if (!check_bittiming_ok(&bt_const.btc, timing)) return false;
     bittiming = *timing;
     return true;
 }
 
 bool CAN_Channel::set_data_bittiming(const gs_device_bittiming *timing) {
-    if (!check_bittiming_ok(&CAN_btconst.btc, timing)) return false;
+    if (!check_bittiming_ok(&bt_const.btc, timing)) return false;
 #ifdef CONFIG_CANFD
     channel->data_bittiming = *timing;
     return true;

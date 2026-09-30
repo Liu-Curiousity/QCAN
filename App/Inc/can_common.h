@@ -43,9 +43,6 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 
-extern const gs_device_bt_const CAN_btconst;
-extern const gs_device_bt_const_extended CAN_btconst_ext;
-
 struct gs_host_frame_object {
     union {
         uint8_t _buf[GS_HOST_FRAME_SIZE];
@@ -59,7 +56,9 @@ public:
         vQueueDelete(xQueue_from_host);
     };
 
-    CAN_Channel(const uint8_t nr, const signal_led& led) : nr(nr), led(led) {
+    CAN_Channel(const uint8_t nr, const signal_led& led, const gs_device_bt_const& bt_const,
+                gs_device_bt_const_extended bt_const_ext = {}) :
+        nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {
         xQueue_from_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
     }
 
@@ -67,8 +66,10 @@ public:
     uint32_t feature{};
     uint8_t nr;
     signal_led led;
+    gs_device_bt_const bt_const;
+    gs_device_bt_const_extended bt_const_ext;
 
-    void get_device_state(gs_device_state *state) const;
+    gs_device_state get_device_state() const;
 
     bool set_bittiming(const gs_device_bittiming *timing);
 
