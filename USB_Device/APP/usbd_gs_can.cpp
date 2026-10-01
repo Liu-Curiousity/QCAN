@@ -318,8 +318,7 @@ void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev) {
 
 static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t len) {
     if (pdev->dev_state == USBD_STATE_CONFIGURED) {
-        USBD_LL_Transmit(pdev, GSUSB_ENDPOINT_IN, buf, len);
-        return USBD_OK;
+        return USBD_LL_Transmit(pdev, GSUSB_ENDPOINT_IN, buf, len);
     }
     return USBD_FAIL;
 }

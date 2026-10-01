@@ -89,9 +89,9 @@ void CAN_Channel::disable() {
     led.mode = signal_led::Mode::OFF;
 }
 
-void CAN_Channel::CAN_SendFrame() {
+void CAN_Channel::CAN_SendFrame(xQueueHandle xQueue_to_host) {
     static bool datain_request = false;
-    gs_host_frame_object rx_frame{};
+    static gs_host_frame_object rx_frame{};
     if (!datain_request && xQueueReceive(xQueue_from_host, rx_frame._buf, 0) == pdPASS) {
         datain_request = true;
         led.blink_request(signal_led::LED_TX);
@@ -99,16 +99,17 @@ void CAN_Channel::CAN_SendFrame() {
     if (datain_request == true) {
         if (drv_send(&rx_frame.frame)) {
             datain_request = false;
+            // Echo sent frame back to host
+            rx_frame.frame.reserved = 0x0;
+            if (IS_ENABLED(CONFIG_CANFD) && rx_frame.frame.flags & GS_CAN_FLAG_FD)
+                rx_frame.frame.canfd_ts->timestamp_us = timer_get();
+            else
+                rx_frame.frame.classic_can_ts->timestamp_us = timer_get();
+            // TODO: 返回给上位机
+            // list_add_tail_locked(&frame_object->list, plist_to_host);
+            xQueueSendToBack(xQueue_to_host, &rx_frame._buf, 0);
         }
     }
-    // Echo sent frame back to host
-    rx_frame.frame.reserved = 0x0;
-    if (IS_ENABLED(CONFIG_CANFD) && rx_frame.frame.flags & GS_CAN_FLAG_FD)
-        rx_frame.frame.canfd_ts->timestamp_us = timer_get();
-    else
-        rx_frame.frame.classic_can_ts->timestamp_us = timer_get();
-    // TODO: 返回给上位机
-    // list_add_tail_locked(&frame_object->list, plist_to_host);
 }
 
 void CAN_Channel::CAN_HandleError(xQueueHandle xQueue_to_host) {

@@ -89,7 +89,7 @@ void StartDebugTask(void *argument) {
         USBD_GS_CAN_SendFrame(&hUSB);
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            hGS_CAN.channels[i].CAN_SendFrame();
+            hGS_CAN.channels[i].CAN_SendFrame(hGS_CAN.xQueue_to_host);
             hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.xQueue_to_host);
             hGS_CAN.channels[i].led.update();
         }

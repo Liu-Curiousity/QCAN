@@ -81,7 +81,7 @@ public:
 
     void disable();
 
-    void CAN_SendFrame();
+    void CAN_SendFrame(xQueueHandle xQueue_to_host);
 
     void CAN_HandleError(xQueueHandle xQueue_to_host);
 
