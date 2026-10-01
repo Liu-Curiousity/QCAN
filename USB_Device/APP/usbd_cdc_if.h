@@ -11,7 +11,7 @@
 #define CDC_CMD_PACKET_SIZE         8
 #define CDC_CONFIG_DESC_SIZE        66
 #define CDC_INTERFACE_STR_INDEX	    0xE2
-#define CDC_INTERFACE_STRING_FS	 "qcan cdc"
+#define CDC_INTERFACE_STRING_FS	    "Serial Interface"
 
 /* Nonblocking, copied TX: 0..64 bytes, USBD_BUSY means retry later.
  * Read returns bytes consumed; unread data NAKs the host instead of dropping.

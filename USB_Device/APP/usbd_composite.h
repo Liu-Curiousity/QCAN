@@ -27,6 +27,14 @@
 
 #include "usbd_def.h"
 
+#define USBD_VID                  0x1D50
+#define USBD_LANGID_STRING        1033
+#define USBD_MANUFACTURER_STRING  "QDrive"
+#define USBD_PID                  0x606F
+#define USBD_PRODUCT_STRING       "QDrive CAN"
+#define USBD_CONFIGURATION_STRING "QDrive CAN Config"
+#define USBD_INTERFACE_STRING     "QDrive CAN Interface"
+
 #define USB_CAN_CONFIG_DESC_SIZ	 (50U + CDC_CONFIG_DESC_SIZE)
 #define USBD_GS_CAN_VENDOR_CODE	 0x20
 #define USBD_MS_OS_20_DESC_SIZE  198U

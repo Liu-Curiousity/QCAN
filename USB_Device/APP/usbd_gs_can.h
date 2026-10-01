@@ -19,7 +19,7 @@
 
 #define GS_CAN_INTERFACE_NUM		 0
 #define GS_CAN_INTERFACE_STR_INDEX	 0xE0
-#define GS_CAN_INTERFACE_STRING_FS	 "canable???"
+#define GS_CAN_INTERFACE_STRING_FS	 "QDrive CAN Interface"
 
 /* Define these here so they can be referenced in other files */
 #ifdef CONFIG_CANFD

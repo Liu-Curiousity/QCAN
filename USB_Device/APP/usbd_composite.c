@@ -44,7 +44,7 @@ USBD_COMPOSITE_HandleTypeDef hcomposite = {
 };
 
 /* Configuration Descriptor */
-__ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __ALIGN_END ={
+__ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[] __ALIGN_END ={
 	/*---------------------------------------------------------------------------*/
 	/* Configuration Descriptor */
 	0x09,                             /* bLength */

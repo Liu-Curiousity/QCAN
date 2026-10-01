@@ -20,7 +20,7 @@
 
 #define DFU_INTERFACE_NUM		 1
 #define DFU_INTERFACE_STR_INDEX	 0xE1
-#define DFU_INTERFACE_STRING_FS	 "canable firmware upgrade interface"
+#define DFU_INTERFACE_STRING_FS	 "QDrive CAN DFU Interface"
 
 /* DFU Class Subclass */
 #define USB_DFU_SUBCLASS 0x01
