@@ -5,12 +5,8 @@
 #include "usbd_core.h"
 #include "usbd_desc.h"
 #include "usbd_gs_can.h"
-#include "task_public.h"
 #include "timer.h"
-
-#include "FreeRTOS.h"
-#include "queue.h"
-#include "task.h"
+#include "queue"
 #include <cstring>
 #include "util.h"
 
@@ -56,7 +52,7 @@ static USBD_HandleTypeDef hUSB;
 
 static void USB_Disconnected() {
     __HAL_RCC_USB_FORCE_RESET();
-    vTaskDelay(200);
+    HAL_Delay(200);
     __HAL_RCC_USB_RELEASE_RESET();
 
     GPIO_InitTypeDef GPIO_Initure;
@@ -70,10 +66,10 @@ static void USB_Disconnected() {
 
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
     HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
-    vTaskDelay(300);
+    HAL_Delay(300);
 }
 
-void StartDebugTask(void *argument) {
+extern "C" void app_main() {
     USB_Disconnected();
     USBD_Init(&hUSB, &FS_Desc, DEVICE_FS);
     USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
@@ -87,15 +83,14 @@ void StartDebugTask(void *argument) {
         hGS_CAN.USBD_GS_CAN_SendFrame(&hUSB);
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            hGS_CAN.channels[i].CAN_SendFrame(hGS_CAN.xQueue_to_host);
-            hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.xQueue_to_host);
+            hGS_CAN.channels[i].CAN_SendFrame(hGS_CAN.queue_to_host);
+            hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.queue_to_host);
             hGS_CAN.channels[i].led.update();
         }
     }
 }
 
 extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     if (hcan == &::hcan) {
         static bool queue_overflow = false;
         while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO0)) {
@@ -115,8 +110,7 @@ extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
             rx_frame.flags = queue_overflow ? GS_CAN_FLAG_OVERFLOW : 0;
             can_channel_0.led.blink_request(signal_led::LED_RX);
 
-            queue_overflow = xQueueSendToBackFromISR(hGS_CAN.xQueue_to_host, rx_object._buf, &xHigherPriorityTaskWoken) != pdPASS;
+            hGS_CAN.queue_to_host.push(rx_object);
         }
-        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
     }
 }

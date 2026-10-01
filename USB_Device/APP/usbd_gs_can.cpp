@@ -22,7 +22,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) {
 uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_IN, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_OUT, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
-    xQueueReset(xQueue_to_host);
+    while (!queue_to_host.empty()) queue_to_host.pop();
     PrepareReceive(pdev);
     return USBD_OK;
 }
@@ -237,13 +237,14 @@ out_fail:
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+    if (epnum != (GSUSB_ENDPOINT_IN & EP_ADDR_MSK)) return USBD_OK;
     to_host_sending = false;
     return USBD_OK;
 }
 
 // Note that the return value is completely ignored by the stack.
 uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
-    if (epnum != GSUSB_ENDPOINT_OUT) return USBD_OK;
+    if (epnum != (GSUSB_ENDPOINT_OUT & EP_ADDR_MSK)) return USBD_OK;
 
     uint32_t rxlen = USBD_LL_GetRxDataSize(pdev, epnum);
     if (rxlen < struct_size(&from_host_buf.frame, classic_can, 1)) {
@@ -266,7 +267,8 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epn
 
     // Enqueue the frame we just received.
     // TODO: 未处理溢出
-    bool queue_overflow = xQueueSendToBack(channel->xQueue_from_host, &from_host_buf._buf, 0) != pdPASS;
+    channel->queue_from_host.push(from_host_buf);
+    bool queue_overflow = false;
 
 #if defined(USB) || defined(USB_DRD_FS)
     // Not all RX buffers are ready. We got enough in the
@@ -327,7 +329,8 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
 void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
     static gs_host_frame_object rx_frame{};
     if (to_host_sending) return;
-    if (xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) != pdPASS) return;
+    if (queue_to_host.empty()) return;
+    rx_frame = queue_to_host.front();
 
     const CAN_Channel *channel = &hGS_CAN.channels[rx_frame.frame.channel];
     const gs_host_frame *frame = &rx_frame.frame;
@@ -371,7 +374,7 @@ void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) 
     }
 
     to_host_sending = true;
-    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) != USBD_OK) {
-        xQueueSendToBack(hGS_CAN.xQueue_to_host, rx_frame._buf, 0);
+    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) == USBD_OK) {
+        queue_to_host.pop();
     }
 }

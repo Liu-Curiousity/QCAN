@@ -16,8 +16,7 @@ static bool tx_busy, tx_zlp;
 static uint8_t alternate_setting;
 static uint16_t interface_status;
 
-static uint8_t USBD_CDC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
-{
+static uint8_t USBD_CDC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     device = NULL;
     USBD_LL_CloseEP(pdev, CDC_IN_EP);
     USBD_LL_CloseEP(pdev, CDC_OUT_EP);
@@ -30,8 +29,7 @@ static uint8_t USBD_CDC_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
     return USBD_OK;
 }
 
-uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
-{
+uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     static const uint8_t defaults[7] = {0x00, 0xc2, 0x01, 0x00, 0, 0, 8};
     memcpy(line_coding, defaults, sizeof(line_coding)); /* 115200 8N1 */
     rx_length = rx_offset = control_lines = 0;
@@ -49,13 +47,12 @@ uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
         goto fail;
     device = pdev;
     return USBD_OK;
-    fail:
-        USBD_CDC_DeInit(pdev, cfgidx);
+fail:
+    USBD_CDC_DeInit(pdev, cfgidx);
     return USBD_FAIL;
 }
 
-static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
-{
+static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
     if (!((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
           (req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE)))
         return USBD_OK;
@@ -64,17 +61,17 @@ static uint8_t USBD_CDC_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
         goto fail;
     if (req->bmRequest == 0x21 && req->wIndex == CDC_CONTROL_INTERFACE) {
         switch (req->bRequest) {
-        case 0x20: /* SET_LINE_CODING */
-            if (req->wValue != 0 || req->wLength != 7)
+            case 0x20: /* SET_LINE_CODING */
+                if (req->wValue != 0 || req->wLength != 7)
+                    goto fail;
+                return USBD_CtlPrepareRx(pdev, pending_line_coding, 7);
+            case 0x22: /* SET_CONTROL_LINE_STATE */
+                if (req->wLength != 0 || (req->wValue & ~3U) != 0)
+                    goto fail;
+                control_lines = req->wValue;
+                return USBD_OK;
+            default:
                 goto fail;
-            return USBD_CtlPrepareRx(pdev, pending_line_coding, 7);
-        case 0x22: /* SET_CONTROL_LINE_STATE */
-            if (req->wLength != 0 || (req->wValue & ~3U) != 0)
-                goto fail;
-            control_lines = req->wValue;
-            return USBD_OK;
-        default:
-            goto fail;
         }
     }
     if (req->bmRequest == 0xa1 && req->wIndex == CDC_CONTROL_INTERFACE &&
@@ -97,10 +94,9 @@ fail:
     return USBD_FAIL;
 }
 
-static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
-{
+static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev) {
     if (!((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
-        (pdev->request.wIndex == CDC_CONTROL_INTERFACE || pdev->request.wIndex == CDC_DATA_INTERFACE)))
+          (pdev->request.wIndex == CDC_CONTROL_INTERFACE || pdev->request.wIndex == CDC_DATA_INTERFACE)))
         return USBD_OK;
 
     if (pdev->request.bmRequest != 0x21 || pdev->request.bRequest != 0x20 ||
@@ -110,9 +106,8 @@ static uint8_t USBD_CDC_EP0_RxReady(USBD_HandleTypeDef *pdev)
     return USBD_OK;
 }
 
-static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
-{
-    if (epnum != (CDC_IN_EP & 0x7F)) return USBD_OK;
+static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+    if (epnum != (CDC_IN_EP & EP_ADDR_MSK)) return USBD_OK;
 
     if (tx_zlp) {
         tx_zlp = false;
@@ -126,7 +121,7 @@ static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum)
 }
 
 static uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
-    if (epnum != CDC_OUT_EP) return USBD_OK;
+    if (epnum != (CDC_OUT_EP & EP_ADDR_MSK)) return USBD_OK;
 
     rx_offset = 0;
     rx_length = (uint16_t)USBD_LL_GetRxDataSize(pdev, CDC_OUT_EP);
@@ -145,8 +140,7 @@ USBD_ClassTypeDef USBD_CDC = {
     .DataOut = USBD_CDC_DataOut,
 };
 
-uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity)
-{
+uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity) {
     if (buffer == NULL || capacity == 0)
         return 0;
     bool irq = disable_irq();
@@ -167,8 +161,7 @@ uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity)
     return length;
 }
 
-uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length)
-{
+uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length) {
     if (length > CDC_PACKET_SIZE || (buffer == NULL && length != 0))
         return USBD_FAIL;
     bool irq = disable_irq();
@@ -190,8 +183,7 @@ uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length)
 }
 
 
-uint16_t CDC_GetControlLineState_FS(void)
-{
+uint16_t CDC_GetControlLineState_FS(void) {
     bool irq = disable_irq();
     uint16_t result = control_lines;
     restore_irq(irq);

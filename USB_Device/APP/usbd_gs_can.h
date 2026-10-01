@@ -31,6 +31,7 @@
 #ifdef __cplusplus
 
 #include <algorithm>
+#include <queue>
 #include "can_common.h"
 
 class USBD_GS_CAN_HandleTypeDef {
@@ -38,14 +39,9 @@ public:
     // template <std::size_t N>
     explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
         channels(&channels), channel_count(1), sof_timestamp_us(0) {
-        xQueue_to_host = xQueueCreate(20, GS_HOST_FRAME_SIZE);
     }
 
-    ~USBD_GS_CAN_HandleTypeDef() {
-        vQueueDelete(xQueue_to_host);
-    }
-
-    xQueueHandle xQueue_to_host; // 向主机发送帧的队列
+    std::queue<gs_host_frame_object> queue_to_host; // 向主机发送帧的队列
 
     CAN_Channel *channels;
     size_t channel_count{};

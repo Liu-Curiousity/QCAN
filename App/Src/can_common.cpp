@@ -73,7 +73,7 @@ bool CAN_Channel::is_enabled() const {
 }
 
 bool CAN_Channel::enable(const uint32_t feature) {
-    xQueueReset(xQueue_from_host);
+    while (!queue_from_host.empty()) queue_from_host.pop();
     led.mode = signal_led::Mode::NORMAL;
     state = GS_CAN_STATE_ERROR_ACTIVE;
     this->feature = feature;
@@ -89,10 +89,13 @@ void CAN_Channel::disable() {
     led.mode = signal_led::Mode::OFF;
 }
 
-void CAN_Channel::CAN_SendFrame(xQueueHandle xQueue_to_host) {
+void CAN_Channel::CAN_SendFrame(std::queue<gs_host_frame_object>& queue_to_host) {
     static bool datain_request = false;
     static gs_host_frame_object rx_frame{};
-    if (!datain_request && xQueueReceive(xQueue_from_host, rx_frame._buf, 0) == pdPASS) {
+    if (!datain_request && !queue_from_host.empty()) {
+        // TODO: queue逻辑可优化
+        rx_frame = queue_from_host.front();
+        queue_from_host.pop();
         datain_request = true;
         led.blink_request(signal_led::LED_TX);
     }
@@ -106,13 +109,12 @@ void CAN_Channel::CAN_SendFrame(xQueueHandle xQueue_to_host) {
             else
                 rx_frame.frame.classic_can_ts->timestamp_us = timer_get();
             // TODO: 返回给上位机
-            // list_add_tail_locked(&frame_object->list, plist_to_host);
-            xQueueSendToBack(xQueue_to_host, &rx_frame._buf, 0);
+            queue_to_host.push(rx_frame);
         }
     }
 }
 
-void CAN_Channel::CAN_HandleError(xQueueHandle xQueue_to_host) {
+void CAN_Channel::CAN_HandleError(std::queue<gs_host_frame_object>& queue_to_host) {
     if (drv_is_rx_pending()) return;
 
     gs_host_frame_object frame_object{
@@ -147,7 +149,7 @@ void CAN_Channel::CAN_HandleError(xQueueHandle xQueue_to_host) {
     } else {
         return;
     }
-    xQueueSendToBack(xQueue_to_host, &frame_object._buf, 0);
+    queue_to_host.push(frame_object);
 }
 
 uint8_t CAN_Channel::controller_error_flags() const {

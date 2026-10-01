@@ -40,29 +40,25 @@
 
 #include "gs_usb.h"
 #include "led.h"
-#include "FreeRTOS.h"
-#include "queue.h"
+#include "queue"
 
 struct gs_host_frame_object {
     union {
         uint8_t _buf[GS_HOST_FRAME_SIZE];
         gs_host_frame frame;
     };
+
+    gs_host_frame_object& operator=(int _cpp_par_);
 };
 
 class CAN_Channel {
 public:
-    virtual ~CAN_Channel() {
-        vQueueDelete(xQueue_from_host);
-    };
-
     CAN_Channel(const uint8_t nr, const signal_led& led, const gs_device_bt_const& bt_const,
                 gs_device_bt_const_extended bt_const_ext = {}) :
         nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {
-        xQueue_from_host = xQueueCreate(20, GS_HOST_FRAME_SIZE);
     }
 
-    xQueueHandle xQueue_from_host; // 待发送到CAN总线的帧队列
+    std::queue<gs_host_frame_object> queue_from_host; // 从上位机接收的帧队列
     uint32_t feature{};
     uint8_t nr;
     signal_led led;
@@ -81,9 +77,9 @@ public:
 
     void disable();
 
-    void CAN_SendFrame(xQueueHandle xQueue_to_host);
+    void CAN_SendFrame(std::queue<gs_host_frame_object>& queue_to_host);
 
-    void CAN_HandleError(xQueueHandle xQueue_to_host);
+    void CAN_HandleError(std::queue<gs_host_frame_object>& queue_to_host);
 
 protected:
     uint8_t tx_error_count{};
