@@ -54,8 +54,6 @@ bxcan_ can_channel_0{
 USBD_GS_CAN_HandleTypeDef hGS_CAN{can_channel_0};
 static USBD_HandleTypeDef hUSB;
 
-void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev);
-
 static void USB_Disconnected() {
     __HAL_RCC_USB_FORCE_RESET();
     vTaskDelay(200);
@@ -86,7 +84,7 @@ void StartDebugTask(void *argument) {
         USBD_GS_CAN_ReceiveFromHost(&hUSB);
 
         /*==========================向上位机发送帧============================*/
-        USBD_GS_CAN_SendFrame(&hUSB);
+        hGS_CAN.USBD_GS_CAN_SendFrame(&hUSB);
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
             hGS_CAN.channels[i].CAN_SendFrame(hGS_CAN.xQueue_to_host);

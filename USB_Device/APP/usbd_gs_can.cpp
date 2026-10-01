@@ -237,6 +237,7 @@ out_fail:
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+    to_host_sending = false;
     return USBD_OK;
 }
 
@@ -323,14 +324,10 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
     return USBD_FAIL;
 }
 
-void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
-    static bool datain_request = false;
+void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
     static gs_host_frame_object rx_frame{};
-
-    if (!datain_request && xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) == pdPASS) {
-        datain_request = true;
-    }
-    if (datain_request == false) return;
+    if (to_host_sending) return;
+    if (xQueueReceive(hGS_CAN.xQueue_to_host, rx_frame._buf, 0) != pdPASS) return;
 
     const CAN_Channel *channel = &hGS_CAN.channels[rx_frame.frame.channel];
     const gs_host_frame *frame = &rx_frame.frame;
@@ -373,7 +370,8 @@ void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
         len = sizeof(buf);
     }
 
-    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) == USBD_OK) {
-        datain_request = false;
+    to_host_sending = true;
+    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) != USBD_OK) {
+        xQueueSendToBack(hGS_CAN.xQueue_to_host, rx_frame._buf, 0);
     }
 }

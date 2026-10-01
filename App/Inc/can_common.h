@@ -59,7 +59,7 @@ public:
     CAN_Channel(const uint8_t nr, const signal_led& led, const gs_device_bt_const& bt_const,
                 gs_device_bt_const_extended bt_const_ext = {}) :
         nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {
-        xQueue_from_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
+        xQueue_from_host = xQueueCreate(20, GS_HOST_FRAME_SIZE);
     }
 
     xQueueHandle xQueue_from_host; // 待发送到CAN总线的帧队列

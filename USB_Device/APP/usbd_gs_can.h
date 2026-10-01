@@ -38,7 +38,7 @@ public:
     // template <std::size_t N>
     explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
         channels(&channels), channel_count(1), sof_timestamp_us(0) {
-        xQueue_to_host = xQueueCreate(10, GS_HOST_FRAME_SIZE);
+        xQueue_to_host = xQueueCreate(20, GS_HOST_FRAME_SIZE);
     }
 
     ~USBD_GS_CAN_HandleTypeDef() {
@@ -50,11 +50,7 @@ public:
     CAN_Channel *channels;
     size_t channel_count{};
 
-    [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
-        return ch < channel_count ? &channels[ch] : nullptr;
-    }
-
-    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
+    void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev);
 
     uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
 
@@ -105,6 +101,7 @@ private:
     uint32_t sof_timestamp_us;
     USBD_SetupReqTypedef last_setup_request{};
     gs_host_frame_object from_host_buf{}; // 从主机接收到帧后使用的双缓冲指针
+    bool to_host_sending{false};
 
     // device info
     const gs_device_config USBD_GS_CAN_dconf = {
@@ -112,6 +109,13 @@ private:
         .sw_version = 2,
         .hw_version = 1,
     };
+
+    [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
+        return ch < channel_count ? &channels[ch] : nullptr;
+    }
+
+    uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
+
 } __attribute__ ((aligned (4)));
 
 extern "C" {
