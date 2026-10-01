@@ -2,15 +2,16 @@
 
 #include "usbd_def.h"
 
-#define CDC_CONTROL_INTERFACE       2U
-#define CDC_DATA_INTERFACE          3U
-#define CDC_IN_EP                   0x83U
-#define CDC_OUT_EP                  0x03U
-#define CDC_CMD_EP                  0x84U
-#define CDC_PACKET_SIZE             64U
-#define CDC_CMD_PACKET_SIZE         8U
-#define CDC_CONFIG_DESC_SIZE        66U
-#define CDC_INTERFACE_STR_INDEX	    0xE1
+#define CDC_CONTROL_INTERFACE       2
+#define CDC_DATA_INTERFACE          3
+#define CDC_IN_EP                   0x83
+#define CDC_OUT_EP                  0x03
+#define CDC_CMD_EP                  0x84
+#define CDC_PACKET_SIZE             64
+#define CDC_CMD_PACKET_SIZE         8
+#define CDC_CONFIG_DESC_SIZE        66
+#define CDC_INTERFACE_STR_INDEX	    0xE2
+#define CDC_INTERFACE_STRING_FS	 "qcan cdc"
 
 /* Nonblocking, copied TX: 0..64 bytes, USBD_BUSY means retry later.
  * Read returns bytes consumed; unread data NAKs the host instead of dropping.

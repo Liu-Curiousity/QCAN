@@ -27,7 +27,6 @@
 #include "usb.h"
 #include "gs_usb.h"
 #include "usbd_cdc_if.h"
-#include "usbd_gs_can.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -73,19 +72,7 @@ void HAL_PCD_SetupStageCallback(PCD_HandleTypeDef *hpcd)
 #endif /* USE_HAL_PCD_REGISTER_CALLBACKS */
 {
   /* USER CODE BEGIN HAL_PCD_SetupStageCallback_PreTreatment */
-	USBD_HandleTypeDef *pdev = hpcd->pData;
-	USBD_ParseSetupRequest(&pdev->request, (uint8_t *)hpcd->Setup);
 
-	bool request_was_handled = false;
-
-	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE) { // device request
-		request_was_handled = USBD_CustomDeviceRequest(pdev, &pdev->request);
-	}
-
-	if ((pdev->request.bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE) { // interface request
-		request_was_handled = USBD_CustomInterfaceRequest(pdev, &pdev->request);
-	}
-  if (request_was_handled) return;
   /* USER CODE END  HAL_PCD_SetupStageCallback_PreTreatment */
   USBD_LL_SetupStage((USBD_HandleTypeDef*)hpcd->pData, (uint8_t *)hpcd->Setup);
   /* USER CODE BEGIN HAL_PCD_SetupStageCallback_PostTreatment */
@@ -260,18 +247,8 @@ USBD_StatusTypeDef USBD_LL_Init(USBD_HandleTypeDef *pdev)
 	hpcd_USB_FS.Init.phy_itface = PCD_PHY_EMBEDDED;
 	hpcd_USB_FS.Init.low_power_enable = DISABLE;
 	hpcd_USB_FS.Init.lpm_enable = DISABLE;
-#if defined(STM32F4)
-	hpcd_USB_FS.Init.dma_enable = DISABLE;
-	hpcd_USB_FS.Init.Sof_enable = DISABLE;
-	hpcd_USB_FS.Init.vbus_sensing_enable = DISABLE;
-	hpcd_USB_FS.Init.use_dedicated_ep1 = DISABLE;
-#elif defined(STM32G0)
-	hpcd_USB_FS.Init.Sof_enable = DISABLE;
-	hpcd_USB_FS.Init.battery_charging_enable = DISABLE;
-	hpcd_USB_FS.Init.vbus_sensing_enable = DISABLE;
-	hpcd_USB_FS.Init.bulk_doublebuffer_enable = ENABLE;
-	hpcd_USB_FS.Init.iso_singlebuffer_enable = DISABLE;
-#endif
+  hpcd_USB_FS.Init.battery_charging_enable = DISABLE;
+
   if (HAL_PCD_Init(&hpcd_USB_FS) != HAL_OK)
   {
     Error_Handler( );

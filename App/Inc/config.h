@@ -55,7 +55,6 @@ THE SOFTWARE.
 #if defined(BOARD_canable)
 	#define USBD_PRODUCT_STRING_FS	 "canable gs_usb"
 	#define USBD_MANUFACTURER_STRING "canable.io"
-	#define DFU_INTERFACE_STRING_FS	 "canable firmware upgrade interface"
 
 	#define TIM2_CLOCK_SPEED		 48000000
 

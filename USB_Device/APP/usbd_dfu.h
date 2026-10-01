@@ -19,7 +19,8 @@
 #include <usbd_def.h>
 
 #define DFU_INTERFACE_NUM		 1
-#define DFU_INTERFACE_STR_INDEX	 0xE0
+#define DFU_INTERFACE_STR_INDEX	 0xE1
+#define DFU_INTERFACE_STRING_FS	 "canable firmware upgrade interface"
 
 /* DFU Class Subclass */
 #define USB_DFU_SUBCLASS 0x01

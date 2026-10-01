@@ -15,6 +15,8 @@
 
 extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
+void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
+
 bxcan_ can_channel_0{
     0,
     &hcan,

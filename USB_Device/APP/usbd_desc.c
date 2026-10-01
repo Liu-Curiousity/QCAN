@@ -25,6 +25,7 @@
 #include "config.h"
 #include "usbd_ctlreq.h"
 #include "usbd_desc.h"
+#include "usbd_composite.h"
 
 /* USER CODE BEGIN INCLUDE */
 
@@ -114,6 +115,7 @@ uint8_t * USBD_FS_ProductStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length
 uint8_t * USBD_FS_SerialStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length);
 uint8_t * USBD_FS_ConfigStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length);
 uint8_t * USBD_FS_InterfaceStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *length);
+uint8_t * USBD_FS_BOSDescriptor(USBD_SpeedTypeDef speed, uint16_t *length);
 
 /**
   * @}
@@ -133,6 +135,7 @@ USBD_DescriptorsTypeDef FS_Desc =
     .GetSerialStrDescriptor = USBD_FS_SerialStrDescriptor,
     .GetConfigurationStrDescriptor = USBD_FS_ConfigStrDescriptor,
     .GetInterfaceStrDescriptor = USBD_FS_InterfaceStrDescriptor,
+    .GetBOSDescriptor = USBD_FS_BOSDescriptor,
 };
 
 #if defined ( __ICCARM__ ) /* IAR Compiler */
@@ -143,7 +146,7 @@ __ALIGN_BEGIN uint8_t USBD_FS_DeviceDesc[USB_LEN_DEV_DESC] __ALIGN_END =
 {
   0x12,                       /*bLength */
   USB_DESC_TYPE_DEVICE,       /*bDescriptorType*/
-  0x00,                       /*bcdUSB */
+  0x10,                       /*bcdUSB: 2.10, supports BOS */
   0x02,
   0xEF,                       /*bDeviceClass: miscellaneous (IAD)*/
   0x02,                       /*bDeviceSubClass: common class*/
@@ -159,6 +162,32 @@ __ALIGN_BEGIN uint8_t USBD_FS_DeviceDesc[USB_LEN_DEV_DESC] __ALIGN_END =
   USBD_IDX_PRODUCT_STR,       /*Index of product string*/
   USBD_IDX_SERIAL_STR,        /*Index of serial number string*/
   USBD_MAX_NUM_CONFIGURATION  /*bNumConfigurations*/
+};
+
+/* BOS: USB 2.0 extension (LPM disabled) and Microsoft OS 2.0 capability. */
+__ALIGN_BEGIN static uint8_t USBD_FS_BOSDesc[] __ALIGN_END = {
+  0x05,                       /*bLength */
+  USB_DESC_TYPE_BOS,          /*bDescriptorType*/
+  0x21, 0x00,                 /*wTotalLength*/
+  0x01,                       /*bNumDeviceCaps*/
+
+  /* MS OS 2.0 Platform Capability Descriptor */
+  0x1C,                       /* bLength */
+  0x10,                       /* bDescriptorType */
+  0x05,                       /* bDevCapabilityType */
+  0x00,                       /* bReserved */
+
+  /* MS OS 2.0 UUID: D8DD60DF-4589-4CC7-9CD2-659D9E648A9F */
+  0xDF, 0x60, 0xDD, 0xD8,
+  0x89, 0x45,
+  0xC7, 0x4C,
+  0x9C, 0xD2,
+  0x65, 0x9D, 0x9E, 0x64, 0x8A, 0x9F,
+
+  0x00, 0x00, 0x03, 0x06,     /* Windows version (Win8.1+) */
+  LOBYTE(USBD_MS_OS_20_DESC_SIZE), HIBYTE(USBD_MS_OS_20_DESC_SIZE),/* wMSOSDescriptorSetTotalLength */
+  USBD_GS_CAN_VENDOR_CODE,    /* bMS_VendorCode */
+  0x00,                       /* bAltEnumCode */
 };
 
 /* USB_DeviceDescriptor */
@@ -325,6 +354,14 @@ uint8_t *USBD_FS_InterfaceStrDescriptor(USBD_SpeedTypeDef speed, uint16_t *lengt
   }
   return USBD_StrDesc;
 }
+
+uint8_t *USBD_FS_BOSDescriptor(USBD_SpeedTypeDef speed, uint16_t *length)
+{
+  UNUSED(speed);
+  *length = sizeof(USBD_FS_BOSDesc);
+  return USBD_FS_BOSDesc;
+}
+
 
 /**
   * @brief  Create the serial number string descriptor

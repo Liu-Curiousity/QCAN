@@ -43,11 +43,8 @@ USBD_COMPOSITE_HandleTypeDef hcomposite = {
 	.pClass = {&USBD_CDC, &USBD_DFU, &USBD_GS_CAN},
 };
 
-#define CDC_INTERFACE_STRING_FS	 "qcan cdc"
-
 /* Configuration Descriptor */
-__ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __ALIGN_END =
-{
+__ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __ALIGN_END ={
 	/*---------------------------------------------------------------------------*/
 	/* Configuration Descriptor */
 	0x09,                             /* bLength */
@@ -65,13 +62,13 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	/* GS_USB Interface Descriptor */
 	0x09,                             /* bLength */
 	USB_DESC_TYPE_INTERFACE,          /* bDescriptorType */
-	0x00,                             /* bInterfaceNumber */
+	GS_CAN_INTERFACE_NUM,             /* bInterfaceNumber */
 	0x00,                             /* bAlternateSetting */
 	0x02,                             /* bNumEndpoints */
 	0xFF,                             /* bInterfaceClass: Vendor Specific*/
 	0xFF,                             /* bInterfaceSubClass: Vendor Specific */
 	0xFF,                             /* bInterfaceProtocol: Vendor Specific */
-	0x00,                             /* iInterface */
+	GS_CAN_INTERFACE_STR_INDEX,		  /* iInterface */
 	/*---------------------------------------------------------------------------*/
 
 	/*---------------------------------------------------------------------------*/
@@ -98,7 +95,6 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 
 	/*---------------------------------------------------------------------------*/
 	/* DFU Interface Descriptor */
-	/*---------------------------------------------------------------------------*/
 	0x09,                             /* bLength */
 	USB_DESC_TYPE_INTERFACE,          /* bDescriptorType */
 	DFU_INTERFACE_NUM,                /* bInterfaceNumber */
@@ -108,17 +104,19 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	0x01,                             /* bInterfaceSubClass */
 	0x01,                             /* bInterfaceProtocol : Runtime mode */
 	DFU_INTERFACE_STR_INDEX,          /* iInterface */
+	/*---------------------------------------------------------------------------*/
 
 	/*---------------------------------------------------------------------------*/
 	/* Run-Time DFU Functional Descriptor */
-	/*---------------------------------------------------------------------------*/
 	0x09,                             /* bLength */
 	0x21,                             /* bDescriptorType: DFU FUNCTIONAL */
 	0x0B,                             /* bmAttributes: detach, upload, download */
 	0xFF, 0x00,                       /* wDetachTimeOut */
 	0x00, 0x08,                       /* wTransferSize */
 	0x1a, 0x01,                       /* bcdDFUVersion: 1.1a */
+	/*---------------------------------------------------------------------------*/
 
+	/*---------------------------------------------------------------------------*/
 	/* CDC ACM: IAD groups interfaces 2 (control) and 3 (data). */
 	0x08,                             /* bLength */
 	0x0B,
@@ -128,7 +126,9 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	0x02,
 	0x01,
 	0x00,
+	/*---------------------------------------------------------------------------*/
 
+	/*---------------------------------------------------------------------------*/
 	0x09,                             /* bLength */
 	USB_DESC_TYPE_INTERFACE,		  /* bDescriptorType */
 	CDC_CONTROL_INTERFACE,			  /* bInterfaceNumber */
@@ -138,7 +138,9 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	0x02,							  /* bInterfaceSubClass */
 	0x01,							  /* bInterfaceProtocol */
 	CDC_INTERFACE_STR_INDEX,		  /* iInterface: */
+	/*---------------------------------------------------------------------------*/
 
+	/*---------------------------------------------------------------------------*/
 	/* Header Functional Descriptor */
 	0x05,							  /* bLength: Endpoint Descriptor size */
 	0x24,							  /* bDescriptorType: CS_INTERFACE */
@@ -175,6 +177,7 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	0x00,
 	0x10,
 
+	/*---------------------------------------------------------------------------*/
 	0x09,
 	USB_DESC_TYPE_INTERFACE,
 	CDC_DATA_INTERFACE,
@@ -184,7 +187,9 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	0x00,
 	0x00,
 	0x00,
+	/*---------------------------------------------------------------------------*/
 
+	/*---------------------------------------------------------------------------*/
 	0x07,
 	USB_DESC_TYPE_ENDPOINT,
 	CDC_OUT_EP,
@@ -192,7 +197,9 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	CDC_PACKET_SIZE,
 	0x00,
 	0x00,
+	/*---------------------------------------------------------------------------*/
 
+	/*---------------------------------------------------------------------------*/
 	0x07,
 	USB_DESC_TYPE_ENDPOINT,
 	CDC_IN_EP,
@@ -200,91 +207,66 @@ __ALIGN_BEGIN static uint8_t USBD_COMPOSITE_CfgDesc[USB_CAN_CONFIG_DESC_SIZ] __A
 	CDC_PACKET_SIZE,
 	0x00,
 	0x00,
+	/*---------------------------------------------------------------------------*/
 };
 
-/* Microsoft OS String Descriptor */
-__ALIGN_BEGIN static uint8_t USBD_WINUSB_STR[] __ALIGN_END =
-{
-	0x12,                    /* length */
-	0x03,                    /* descriptor type == string */
-	0x4D, 0x00, 0x53, 0x00,  /* signature: "MSFT100" */
-	0x46, 0x00, 0x54, 0x00,
-	0x31, 0x00, 0x30, 0x00,
-	0x30, 0x00,
-	USBD_GS_CAN_VENDOR_CODE, /* vendor code */
-	0x00                     /* padding */
-};
+/* Default configuration: function subsets keep WinUSB off the CDC interfaces. */
+__ALIGN_BEGIN static uint8_t USBD_MS_OS_20_DESC[] __ALIGN_END = {
+	/* Descriptor set header: Windows 8.1 and later. */
+	0x0A, 0x00,							/* wLength */
+	0x00, 0x00,							/* wDescriptorType */
+	0x00, 0x00, 0x03, 0x06,				/* dwWindowsVersion */
+	LOBYTE(USBD_MS_OS_20_DESC_SIZE), HIBYTE(USBD_MS_OS_20_DESC_SIZE),/* wDescriptorSetTotalLength */
 
-/* Microsoft Compatible ID Feature Descriptor */
-__ALIGN_BEGIN static uint8_t USBD_MS_COMP_ID_FEATURE_DESC[] __ALIGN_END = {
-	0x40, 0x00, 0x00, 0x00, /* length */
-	0x00, 0x01,             /* version 1.0 */
-	0x04, 0x00,             /* descr index (0x0004) */
-	0x02,                   /* number of sections */
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00, 0x00,
-	0x00,                   /* interface number */
-	0x01,                   /* reserved */
-	0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
-	0x53, 0x42, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* reserved */
+	/* CAN function subset: 8 + 20 + 132 bytes. */
+	0x08, 0x00,							/* wLength */
+	0x02, 0x00,							/* wDescriptorType */
+	0x00,								/* bFirstInterface */
+	0x00,								/* bReserved */
+	0xA0, 0x00,							/* wSubsetLength */
+
+	/* Compatible ID: WINUSB */
+	0x14, 0x00,							/* wLength */
+	0x03, 0x00,							/* wDescriptorType */
+	'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,/* CompatibleID */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,/* SubCompatibleID */
+
+	/* Registry property: DeviceInterfaceGUIDs, REG_MULTI_SZ (UTF-16LE). */
+	0x84, 0x00,							/* wLength */
+	0x04, 0x00,							/* wDescriptorType */
+	0x07, 0x00,							/* wPropertyDataType */
+	0x2A, 0x00,							/* wPropertyNameLength */
+	/* "DeviceInterfaceGUIDs" */
+	'D', 0x00, 'e', 0x00, 'v', 0x00, 'i', 0x00,
+	'c', 0x00, 'e', 0x00, 'I', 0x00, 'n', 0x00,
+	't', 0x00, 'e', 0x00, 'r', 0x00, 'f', 0x00,
+	'a', 0x00, 'c', 0x00, 'e', 0x00, 'G', 0x00,
+	'U', 0x00, 'I', 0x00, 'D', 0x00, 's', 0x00,
 	0x00, 0x00,
-	0x01,                   /* interface number */
-	0x01,                   /* reserved */
-	0x57, 0x49, 0x4E, 0x55, /* compatible ID ("WINUSB\0\0") */
-	0x53, 0x42, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* sub-compatible ID */
-	0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, /* reserved */
-	0x00, 0x00
-};
+	0x50, 0x00,							/* wPropertyDataLength */
+	/* "{c15b4308-04d3-11e6-b3ea-6057189e6443}\0\0" */
+	0x7b, 0x00, 0x63, 0x00, 0x31, 0x00, 0x35, 0x00,
+	0x62, 0x00, 0x34, 0x00, 0x33, 0x00, 0x30, 0x00,
+	0x38, 0x00, 0x2d, 0x00, 0x30, 0x00, 0x34, 0x00,
+	0x64, 0x00, 0x33, 0x00, 0x2d, 0x00, 0x31, 0x00,
+	0x31, 0x00, 0x65, 0x00, 0x36, 0x00, 0x2d, 0x00,
+	0x62, 0x00, 0x33, 0x00, 0x65, 0x00, 0x61, 0x00,
+	0x2d, 0x00, 0x36, 0x00, 0x30, 0x00, 0x35, 0x00,
+	0x37, 0x00, 0x31, 0x00, 0x38, 0x00, 0x39, 0x00,
+	0x65, 0x00, 0x36, 0x00, 0x34, 0x00, 0x34, 0x00,
+	0x33, 0x00, 0x7d, 0x00, 0x00, 0x00, 0x00, 0x00,
 
-/* Microsoft Extended Properties Feature Descriptor */
-__ALIGN_BEGIN static uint8_t USBD_MS_EXT_PROP_FEATURE_DESC[] __ALIGN_END= {
-	0x92, 0x00, 0x00, 0x00, /* length */
-	0x00, 0x01,             /* version 1.0 */
-	0x05, 0x00,             /* descr index (0x0005) */
-	0x01, 0x00,             /* number of sections */
-	0x88, 0x00, 0x00, 0x00, /* property section size */
-	0x07, 0x00, 0x00, 0x00, /* property data type 7: Unicode REG_MULTI_SZ */
-	0x2a, 0x00,             /* property name length */
+	/* DFU function subset: WinUSB, without the CAN interface GUID. */
+	0x08, 0x00, 						/* wLength */
+	0x02, 0x00, 						/* wDescriptorType */
+	DFU_INTERFACE_NUM,					/* bFirstInterface */
+	0x00,								/* bReserved */
+	0x1C, 0x00,							/* wSubsetLength */
 
-	0x44, 0x00, 0x65, 0x00, /* property name "DeviceInterfaceGUIDs" */
-	0x76, 0x00, 0x69, 0x00,
-	0x63, 0x00, 0x65, 0x00,
-	0x49, 0x00, 0x6e, 0x00,
-	0x74, 0x00, 0x65, 0x00,
-	0x72, 0x00, 0x66, 0x00,
-	0x61, 0x00, 0x63, 0x00,
-	0x65, 0x00, 0x47, 0x00,
-	0x55, 0x00, 0x49, 0x00,
-	0x44, 0x00, 0x73, 0x00,
-	0x00, 0x00,
-
-	0x50, 0x00, 0x00, 0x00, /* property data length */
-
-	0x7b, 0x00, 0x63, 0x00, /* property name: "{c15b4308-04d3-11e6-b3ea-6057189e6443}\0\0" */
-	0x31, 0x00, 0x35, 0x00,
-	0x62, 0x00, 0x34, 0x00,
-	0x33, 0x00, 0x30, 0x00,
-	0x38, 0x00, 0x2d, 0x00,
-	0x30, 0x00, 0x34, 0x00,
-	0x64, 0x00, 0x33, 0x00,
-	0x2d, 0x00, 0x31, 0x00,
-	0x31, 0x00, 0x65, 0x00,
-	0x36, 0x00, 0x2d, 0x00,
-	0x62, 0x00, 0x33, 0x00,
-	0x65, 0x00, 0x61, 0x00,
-	0x2d, 0x00, 0x36, 0x00,
-	0x30, 0x00, 0x35, 0x00,
-	0x37, 0x00, 0x31, 0x00,
-	0x38, 0x00, 0x39, 0x00,
-	0x65, 0x00, 0x36, 0x00,
-	0x34, 0x00, 0x34, 0x00,
-	0x33, 0x00, 0x7d, 0x00,
-	0x00, 0x00, 0x00, 0x00
+	0x14, 0x00, 						/* wLength */
+	0x03, 0x00,							/* wDescriptorType */
+	'W', 'I', 'N', 'U', 'S', 'B', 0x00, 0x00,/* CompatibleID */
+	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,/* SubCompatibleID */
 };
 
 static uint8_t USBD_COMPOSITE_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
@@ -311,6 +293,11 @@ static uint8_t USBD_COMPOSITE_DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 
 static uint8_t USBD_COMPOSITE_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
 	uint8_t ret = USBD_OK;
+	if ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE &&
+	    req->bRequest == USBD_GS_CAN_VENDOR_CODE) {
+		USBD_CtlSendData(pdev, USBD_MS_OS_20_DESC, MIN(sizeof(USBD_MS_OS_20_DESC), req->wLength));
+		return USBD_OK;
+	}
 	const USBD_COMPOSITE_HandleTypeDef *device = pdev->pClassData;
 	for (int i = 0; i < COMPOSITE_DEVICE_NUM; i++) {
 		if (device->pClass[i] != NULL && device->pClass[i]->Setup != NULL) {
@@ -373,15 +360,15 @@ static uint8_t *USBD_COMPOSITE_GetCfgDesc(uint16_t *length)
 static uint8_t *USBD_COMPOSITE_GetStrDesc(USBD_HandleTypeDef *pdev, uint8_t index, uint16_t *length)
 {
 	switch (index) {
+		case GS_CAN_INTERFACE_STR_INDEX:
+			USBD_GetString((uint8_t *)GS_CAN_INTERFACE_STRING_FS, USBD_StrDesc, length);
+			return USBD_StrDesc;
 		case DFU_INTERFACE_STR_INDEX:
 			USBD_GetString((uint8_t *)DFU_INTERFACE_STRING_FS, USBD_StrDesc, length);
 			return USBD_StrDesc;
 		case CDC_INTERFACE_STR_INDEX:
 			USBD_GetString((uint8_t *)CDC_INTERFACE_STRING_FS, USBD_StrDesc, length);
 			return USBD_StrDesc;
-		case 0xEE:
-			*length = (uint16_t)sizeof(USBD_WINUSB_STR);
-			return USBD_WINUSB_STR;
 		default:
 			*length = 0;
 			USBD_CtlError(pdev, 0);
@@ -403,28 +390,3 @@ USBD_ClassTypeDef USBD_COMPOSITE = {
 	.GetOtherSpeedConfigDescriptor = USBD_COMPOSITE_GetCfgDesc,
 	.GetUsrStrDescriptor = USBD_COMPOSITE_GetStrDesc,
 };
-
-bool USBD_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
-{
-	/* CDC SET_LINE_CODING also uses request 0x20. Only intercept vendor IN. */
-	if ((req->bmRequest & 0xE0) == 0xC0 && req->bRequest == USBD_GS_CAN_VENDOR_CODE) {
-		switch (req->wIndex) {
-			case 0x0004:
-				USBD_CtlSendData(pdev, USBD_MS_COMP_ID_FEATURE_DESC, MIN(sizeof(USBD_MS_COMP_ID_FEATURE_DESC), req->wLength));
-				return true;
-			case 0x0005:
-				if (req->wValue == 0) { // only return our GUID for interface #0
-					USBD_CtlSendData(pdev, USBD_MS_EXT_PROP_FEATURE_DESC, MIN(sizeof(USBD_MS_EXT_PROP_FEATURE_DESC), req->wLength));
-					return true;
-				}
-				break;
-		}
-	}
-
-	return false;
-}
-
-bool USBD_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req)
-{
-	return USBD_CustomDeviceRequest(pdev, req);
-}

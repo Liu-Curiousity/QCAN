@@ -17,6 +17,10 @@
 #include "usbd_def.h"
 #include "bxcan.h"
 
+#define GS_CAN_INTERFACE_NUM		 0
+#define GS_CAN_INTERFACE_STR_INDEX	 0xE0
+#define GS_CAN_INTERFACE_STRING_FS	 "canable???"
+
 /* Define these here so they can be referenced in other files */
 #ifdef CONFIG_CANFD
 #define CAN_DATA_MAX_PACKET_SIZE 64    /* Endpoint IN & OUT Packet size */
@@ -113,13 +117,8 @@ private:
 extern "C" {
 #endif
 
-#include <stdbool.h>
-
 extern USBD_ClassTypeDef USBD_GS_CAN;
 
-void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
-bool USBD_CustomDeviceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
-bool USBD_CustomInterfaceRequest(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
 #ifdef __cplusplus
 };
 #endif
