@@ -77,7 +77,7 @@ public:
 
     void disable();
 
-    void CAN_SendFrame(std::queue<gs_host_frame_object>& queue_to_host);
+    void send_frame(std::queue<gs_host_frame_object>& queue_to_host);
 
     void CAN_HandleError(std::queue<gs_host_frame_object>& queue_to_host);
 

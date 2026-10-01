@@ -83,7 +83,7 @@ extern "C" void app_main() {
         hGS_CAN.USBD_GS_CAN_SendFrame(&hUSB);
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            hGS_CAN.channels[i].CAN_SendFrame(hGS_CAN.queue_to_host);
+            hGS_CAN.channels[i].send_frame(hGS_CAN.queue_to_host);
             hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.queue_to_host);
             hGS_CAN.channels[i].led.update();
         }

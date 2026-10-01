@@ -89,19 +89,13 @@ void CAN_Channel::disable() {
     led.mode = signal_led::Mode::OFF;
 }
 
-void CAN_Channel::CAN_SendFrame(std::queue<gs_host_frame_object>& queue_to_host) {
-    static bool datain_request = false;
+void CAN_Channel::send_frame(std::queue<gs_host_frame_object>& queue_to_host) {
     static gs_host_frame_object rx_frame{};
-    if (!datain_request && !queue_from_host.empty()) {
-        // TODO: queue逻辑可优化
+    if (!queue_from_host.empty()) {
         rx_frame = queue_from_host.front();
-        queue_from_host.pop();
-        datain_request = true;
-        led.blink_request(signal_led::LED_TX);
-    }
-    if (datain_request == true) {
         if (drv_send(&rx_frame.frame)) {
-            datain_request = false;
+            queue_from_host.pop();
+            led.blink_request(signal_led::LED_TX);
             // Echo sent frame back to host
             rx_frame.frame.reserved = 0x0;
             if (IS_ENABLED(CONFIG_CANFD) && rx_frame.frame.flags & GS_CAN_FLAG_FD)
