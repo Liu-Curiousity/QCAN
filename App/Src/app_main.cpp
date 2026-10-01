@@ -10,6 +10,7 @@
 
 #include "FreeRTOS.h"
 #include "queue.h"
+#include "task.h"
 #include <cstring>
 #include "util.h"
 
@@ -55,7 +56,27 @@ static USBD_HandleTypeDef hUSB;
 
 void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev);
 
+static void USB_Disconnected() {
+    __HAL_RCC_USB_FORCE_RESET();
+    vTaskDelay(200);
+    __HAL_RCC_USB_RELEASE_RESET();
+
+    GPIO_InitTypeDef GPIO_Initure;
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_Initure.Pin = GPIO_PIN_11 | GPIO_PIN_12;
+    GPIO_Initure.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_Initure.Pull = GPIO_PULLDOWN;
+    GPIO_Initure.Speed = GPIO_SPEED_FREQ_HIGH;
+    HAL_GPIO_Init(GPIOA, &GPIO_Initure);
+
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_RESET);
+    HAL_GPIO_WritePin(GPIOA, GPIO_PIN_12, GPIO_PIN_RESET);
+    vTaskDelay(300);
+}
+
 void StartDebugTask(void *argument) {
+    USB_Disconnected();
     USBD_Init(&hUSB, &FS_Desc, DEVICE_FS);
     USBD_RegisterClass(&hUSB, &USBD_COMPOSITE);
     hUSB.pClassData = &hcomposite;
