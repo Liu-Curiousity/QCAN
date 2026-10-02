@@ -92,7 +92,6 @@ extern "C" void app_main() {
 
 extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
     if (hcan == &::hcan) {
-        static bool queue_overflow = false;
         while (HAL_CAN_GetRxFifoFillLevel(hcan, CAN_RX_FIFO0)) {
             gs_host_frame_object rx_object{};
             gs_host_frame& rx_frame = rx_object.frame;
@@ -107,9 +106,9 @@ extern "C" void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan) {
             if (rx_header.IDE == CAN_ID_EXT) rx_frame.can_id |= CAN_EFF_FLAG;
             if (rx_header.RTR == CAN_RTR_REMOTE) rx_frame.can_id |= CAN_RTR_FLAG;
             rx_frame.channel = can_channel_0.nr;
-            rx_frame.flags = queue_overflow ? GS_CAN_FLAG_OVERFLOW : 0;
-            can_channel_0.led.blink_request(signal_led::LED_RX);
+            rx_frame.flags = 0;
 
+            can_channel_0.led.blink_request(signal_led::LED_RX);
             hGS_CAN.queue_to_host.push(rx_object);
         }
     }

@@ -55,8 +55,7 @@ class CAN_Channel {
 public:
     CAN_Channel(const uint8_t nr, const signal_led& led, const gs_device_bt_const& bt_const,
                 gs_device_bt_const_extended bt_const_ext = {}) :
-        nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {
-    }
+        nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {}
 
     queue_with_irq_lock<gs_host_frame_object> queue_from_host{64}; // 从上位机接收的帧队列
     uint32_t feature{};
@@ -77,9 +76,9 @@ public:
 
     void disable();
 
-    void send_frame(std::queue<gs_host_frame_object>& queue_to_host);
+    void send_frame(queue_with_irq_lock<gs_host_frame_object>& queue_to_host);
 
-    void CAN_HandleError(std::queue<gs_host_frame_object>& queue_to_host);
+    void CAN_HandleError(queue_with_irq_lock<gs_host_frame_object>& queue_to_host);
 
 protected:
     uint8_t tx_error_count{};

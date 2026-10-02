@@ -332,6 +332,8 @@ void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) 
     if (queue_to_host.empty()) return;
     rx_frame = queue_to_host.front();
 
+    if (queue_to_host.is_overflow()) rx_frame.frame.flags |= GS_CAN_FLAG_OVERFLOW;
+
     const CAN_Channel *channel = &hGS_CAN.channels[rx_frame.frame.channel];
     const gs_host_frame *frame = &rx_frame.frame;
     static uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];

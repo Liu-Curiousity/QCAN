@@ -89,25 +89,25 @@ void CAN_Channel::disable() {
     led.mode = signal_led::Mode::OFF;
 }
 
-void CAN_Channel::send_frame(std::queue<gs_host_frame_object>& queue_to_host) {
-    static gs_host_frame_object rx_frame{};
+void CAN_Channel::send_frame(queue_with_irq_lock<gs_host_frame_object>& queue_to_host) {
+    static gs_host_frame_object frame_object{};
     if (!queue_from_host.empty()) {
-        rx_frame = queue_from_host.front();
-        if (drv_send(&rx_frame.frame)) {
+        frame_object = queue_from_host.front();
+        if (drv_send(&frame_object.frame)) {
             queue_from_host.pop();
             led.blink_request(signal_led::LED_TX);
             // Echo sent frame back to host
-            rx_frame.frame.reserved = 0x0;
-            if (IS_ENABLED(CONFIG_CANFD) && rx_frame.frame.flags & GS_CAN_FLAG_FD)
-                rx_frame.frame.canfd_ts->timestamp_us = timer_get();
+            frame_object.frame.reserved = 0x0;
+            if (IS_ENABLED(CONFIG_CANFD) && frame_object.frame.flags & GS_CAN_FLAG_FD)
+                frame_object.frame.canfd_ts->timestamp_us = timer_get();
             else
-                rx_frame.frame.classic_can_ts->timestamp_us = timer_get();
-            queue_to_host.push(rx_frame);
+                frame_object.frame.classic_can_ts->timestamp_us = timer_get();
+            queue_to_host.push(frame_object);
         }
     }
 }
 
-void CAN_Channel::CAN_HandleError(std::queue<gs_host_frame_object>& queue_to_host) {
+void CAN_Channel::CAN_HandleError(queue_with_irq_lock<gs_host_frame_object>& queue_to_host) {
     if (drv_is_rx_pending()) return;
 
     gs_host_frame_object frame_object{
@@ -131,17 +131,22 @@ void CAN_Channel::CAN_HandleError(std::queue<gs_host_frame_object>& queue_to_hos
         } else {
             frame->can_id |= CAN_ERR_CRTL;
             frame->classic_can->data[1] |= controller_error_flags();
-            drv_handle_bus_error(frame);
         }
-    } else if (feature & GS_CAN_FEATURE_BERR_REPORTING && error_pending) {
         drv_handle_bus_error(frame);
     } else if (bus_off_recovery_pending()) {
         drv_handle_bus_off_recovery();
         bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
         frame->can_id |= CAN_ERR_RESTARTED;
+    } else if (feature & GS_CAN_FEATURE_BERR_REPORTING && error_pending) {
+        drv_handle_bus_error(frame);
+    } else if (queue_from_host.is_overflow()) {
+        frame->can_id |= CAN_ERR_CRTL;
+        frame->classic_can->data[1] |= CAN_ERR_CRTL_TX_OVERFLOW;
     } else {
         return;
     }
+    // 错误帧不记录溢出
+    if (queue_to_host.full()) return;
     queue_to_host.push(frame_object);
 }
 
