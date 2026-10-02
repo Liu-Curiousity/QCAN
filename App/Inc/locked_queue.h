@@ -29,17 +29,19 @@ public:
     explicit queue_with_irq_lock(const size_t max_size) : max_size(max_size) {}
 
     bool is_overflow() {
-        const bool overflow = overflow_flag;
-        if (overflow_flag > 0) overflow_flag--;
-        return overflow;
+        const bool overflow_flag = overflow_count;
+        if (overflow_count > 0) overflow_count--;
+        return overflow_flag;
     }
 
-    bool push(const T& value) {
+    void push(const T& value) {
         const bool irq = disable_irq();
-        overflow_flag += std::queue<T>::size() >= max_size;
-        if (!overflow_flag) std::queue<T>::push(value);
+        if (std::queue<T>::size() >= max_size) {
+            overflow_count++;
+        } else {
+            std::queue<T>::push(value);
+        }
         restore_irq(irq);
-        return !overflow_flag;
     }
 
     void pop() {
@@ -99,7 +101,7 @@ public:
 
 private:
     size_t max_size;
-    size_t overflow_flag{false};
+    size_t overflow_count{false};
 };
 #endif
 
