@@ -265,24 +265,9 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epn
         return USBD_OK;
     }
 
-    // Enqueue the frame we just received.
-    // TODO: 未处理溢出
+    // TODO:队列满是否要NAK
     channel->queue_from_host.push(from_host_buf);
-    bool queue_overflow = false;
-
-#if defined(USB) || defined(USB_DRD_FS)
-    // Not all RX buffers are ready. We got enough in the
-    // pre-allocated reserve to ensure callbacks which are going
-    // to be called due to USB frames being received into double
-    // buffer, but disable further RX. If double buffer not in use,
-    // RX would have already been disabled by USB HW.
     PrepareReceive(pdev);
-    if (queue_overflow)
-        PCD_SET_EP_RX_STATUS(((PCD_HandleTypeDef *)pdev->pData)->Instance,
-                         GSUSB_ENDPOINT_OUT,
-                         USB_EP_RX_NAK);
-#endif
-
     return USBD_OK;
 }
 

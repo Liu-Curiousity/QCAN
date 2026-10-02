@@ -34,14 +34,17 @@ public:
         return overflow_flag;
     }
 
-    void push(const T& value) {
+    bool push(const T& value) {
         const bool irq = disable_irq();
+        bool ret = false;
         if (std::queue<T>::size() >= max_size) {
             overflow_count++;
         } else {
             std::queue<T>::push(value);
+            ret = true;
         }
         restore_irq(irq);
+        return ret;
     }
 
     void pop() {

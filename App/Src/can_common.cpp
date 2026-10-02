@@ -137,11 +137,11 @@ void CAN_Channel::CAN_HandleError(queue_with_irq_lock<gs_host_frame_object>& que
         drv_handle_bus_off_recovery();
         bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
         frame->can_id |= CAN_ERR_RESTARTED;
-    } else if (feature & GS_CAN_FEATURE_BERR_REPORTING && error_pending) {
-        drv_handle_bus_error(frame);
     } else if (queue_from_host.is_overflow()) {
         frame->can_id |= CAN_ERR_CRTL;
         frame->classic_can->data[1] |= CAN_ERR_CRTL_TX_OVERFLOW;
+    } else if (feature & GS_CAN_FEATURE_BERR_REPORTING && error_pending) {
+        drv_handle_bus_error(frame);
     } else {
         return;
     }
