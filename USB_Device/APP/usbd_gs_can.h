@@ -31,17 +31,16 @@
 #ifdef __cplusplus
 
 #include <algorithm>
-#include <queue>
+#include "locked_queue.h"
 #include "can_common.h"
 
 class USBD_GS_CAN_HandleTypeDef {
 public:
     // template <std::size_t N>
     explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
-        channels(&channels), channel_count(1), sof_timestamp_us(0) {
-    }
+        channels(&channels), channel_count(1), sof_timestamp_us(0) {}
 
-    std::queue<gs_host_frame_object> queue_to_host; // 向主机发送帧的队列
+    queue_with_irq_lock<gs_host_frame_object> queue_to_host{64}; // 向主机发送帧的队列
 
     CAN_Channel *channels;
     size_t channel_count{};
@@ -111,7 +110,6 @@ private:
     }
 
     uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);
-
 } __attribute__ ((aligned (4)));
 
 extern "C" {

@@ -40,7 +40,7 @@
 
 #include "gs_usb.h"
 #include "led.h"
-#include "queue"
+#include "locked_queue.h"
 
 struct gs_host_frame_object {
     union {
@@ -58,7 +58,7 @@ public:
         nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {
     }
 
-    std::queue<gs_host_frame_object> queue_from_host; // 从上位机接收的帧队列
+    queue_with_irq_lock<gs_host_frame_object> queue_from_host{64}; // 从上位机接收的帧队列
     uint32_t feature{};
     uint8_t nr;
     signal_led led;

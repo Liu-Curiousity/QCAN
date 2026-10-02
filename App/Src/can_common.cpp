@@ -102,7 +102,6 @@ void CAN_Channel::send_frame(std::queue<gs_host_frame_object>& queue_to_host) {
                 rx_frame.frame.canfd_ts->timestamp_us = timer_get();
             else
                 rx_frame.frame.classic_can_ts->timestamp_us = timer_get();
-            // TODO: 返回给上位机
             queue_to_host.push(rx_frame);
         }
     }

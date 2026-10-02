@@ -25,6 +25,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stddef.h>
 #include <stdbool.h>
 #include <stm32f072xb.h>
@@ -100,3 +104,7 @@ static inline void restore_irq(bool was_enabled)
 		enable_irq();
 	}
 }
+
+#ifdef __cplusplus
+}
+#endif
