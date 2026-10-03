@@ -73,7 +73,7 @@ bool CAN_Channel::is_enabled() const {
 }
 
 bool CAN_Channel::enable(const uint32_t feature) {
-    while (!queue_from_host.empty()) queue_from_host.pop();
+    queue_from_host.reset();
     led.mode = signal_led::Mode::NORMAL;
     state = GS_CAN_STATE_ERROR_ACTIVE;
     this->feature = feature;
@@ -82,6 +82,7 @@ bool CAN_Channel::enable(const uint32_t feature) {
 }
 
 void CAN_Channel::disable() {
+    // TODO:关闭通道时并不会清空to_host队列中此通道的消息
     drv_disable();
     bus_off_restart = CAN_CHANNEL_BUS_OFF_RESTART_DISABLED;
     state = GS_CAN_STATE_STOPPED;
@@ -90,7 +91,9 @@ void CAN_Channel::disable() {
 }
 
 void CAN_Channel::send_frame(queue_with_irq_lock<gs_host_frame_object>& queue_to_host) {
+    auto lock = disable_irq();
     static gs_host_frame_object frame_object{};
+    // TODO:可能被USB中断打断，导致为空时front和pop
     if (!queue_from_host.empty()) {
         frame_object = queue_from_host.front();
         if (drv_send(&frame_object.frame)) {
@@ -105,6 +108,7 @@ void CAN_Channel::send_frame(queue_with_irq_lock<gs_host_frame_object>& queue_to
             queue_to_host.push(frame_object);
         }
     }
+    restore_irq(lock);
 }
 
 void CAN_Channel::CAN_HandleError(queue_with_irq_lock<gs_host_frame_object>& queue_to_host) {
@@ -123,6 +127,7 @@ void CAN_Channel::CAN_HandleError(queue_with_irq_lock<gs_host_frame_object>& que
 
     const gs_can_state new_state = drv_read_status();
 
+    // TODO: 重新连接时可能会残留“被动错误”“主动错误”错误帧
     if (is_enabled() && state != new_state) {
         state = new_state;
         if (state == GS_CAN_STATE_BUS_OFF) {

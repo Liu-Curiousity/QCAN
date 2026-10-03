@@ -22,7 +22,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) {
 uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_IN, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
     USBD_LL_OpenEP(pdev, GSUSB_ENDPOINT_OUT, USBD_EP_TYPE_BULK, CAN_DATA_MAX_PACKET_SIZE);
-    while (!queue_to_host.empty()) queue_to_host.pop();
+    queue_to_host.reset();
     PrepareReceive(pdev);
     return USBD_OK;
 }
@@ -314,6 +314,7 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
 void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
     static gs_host_frame_object rx_frame{};
     if (to_host_sending) return;
+    // TODO:可能被USB中断打断，导致为空时front和pop
     if (queue_to_host.empty()) return;
     rx_frame = queue_to_host.front();
 

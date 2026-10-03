@@ -34,6 +34,13 @@ public:
         return overflow_flag;
     }
 
+    void reset() {
+        const bool irq = disable_irq();
+        while (!std::queue<T>::empty()) std::queue<T>::pop();
+        overflow_count = 0;
+        restore_irq(irq);
+    }
+
     bool push(const T& value) {
         const bool irq = disable_irq();
         bool ret = false;
