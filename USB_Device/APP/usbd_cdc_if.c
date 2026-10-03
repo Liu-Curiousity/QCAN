@@ -7,8 +7,8 @@
 #include <string.h>
 
 static USBD_HandleTypeDef *device;
-static uint8_t rx_buffer[CDC_PACKET_SIZE];
-static uint8_t tx_buffer[CDC_PACKET_SIZE];
+static uint8_t rx_buffer[CDC_DATA_MAX_PACKET_SIZE];
+static uint8_t tx_buffer[CDC_DATA_MAX_PACKET_SIZE];
 static uint8_t line_coding[7];
 static uint8_t pending_line_coding[7];
 static uint16_t rx_length, rx_offset, control_lines;
@@ -34,10 +34,10 @@ uint8_t USBD_CDC_Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     memcpy(line_coding, defaults, sizeof(line_coding)); /* 115200 8N1 */
     rx_length = rx_offset = control_lines = 0;
     tx_busy = tx_zlp = false;
-    if (USBD_LL_OpenEP(pdev, CDC_IN_EP, USBD_EP_TYPE_BULK, CDC_PACKET_SIZE) != USBD_OK)
+    if (USBD_LL_OpenEP(pdev, CDC_IN_EP, USBD_EP_TYPE_BULK, CDC_DATA_MAX_PACKET_SIZE) != USBD_OK)
         return USBD_FAIL;
     pdev->ep_in[CDC_IN_EP & 0x7f].is_used = 1;
-    if (USBD_LL_OpenEP(pdev, CDC_OUT_EP, USBD_EP_TYPE_BULK, CDC_PACKET_SIZE) != USBD_OK)
+    if (USBD_LL_OpenEP(pdev, CDC_OUT_EP, USBD_EP_TYPE_BULK, CDC_DATA_MAX_PACKET_SIZE) != USBD_OK)
         goto fail;
     pdev->ep_out[CDC_OUT_EP].is_used = 1;
     if (USBD_LL_OpenEP(pdev, CDC_CMD_EP, USBD_EP_TYPE_INTR, CDC_CMD_PACKET_SIZE) != USBD_OK)
@@ -162,7 +162,7 @@ uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity) {
 }
 
 uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length) {
-    if (length > CDC_PACKET_SIZE || (buffer == NULL && length != 0))
+    if (length > CDC_DATA_MAX_PACKET_SIZE || (buffer == NULL && length != 0))
         return USBD_FAIL;
     bool irq = disable_irq();
     uint8_t result = USBD_FAIL;
@@ -172,7 +172,7 @@ uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length) {
             if (length != 0)
                 memcpy(tx_buffer, buffer, length);
             tx_busy = true;
-            tx_zlp = length == CDC_PACKET_SIZE;
+            tx_zlp = length == CDC_DATA_MAX_PACKET_SIZE;
             result = USBD_LL_Transmit(device, CDC_IN_EP, tx_buffer, length);
             if (result != USBD_OK)
                 tx_busy = tx_zlp = false;

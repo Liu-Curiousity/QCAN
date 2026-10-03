@@ -7,9 +7,11 @@
 #define CDC_IN_EP                   0x83
 #define CDC_OUT_EP                  0x03
 #define CDC_CMD_EP                  0x84
-#define CDC_PACKET_SIZE             64
+
+#define CDC_BINTERVAL               0x10    // Interrupt polling interval in ms
+
+#define CDC_DATA_MAX_PACKET_SIZE    64
 #define CDC_CMD_PACKET_SIZE         8
-#define CDC_CONFIG_DESC_SIZE        66
 #define CDC_INTERFACE_STR_INDEX	    0xE2
 #define CDC_INTERFACE_STRING_FS	    "Serial Interface"
 
