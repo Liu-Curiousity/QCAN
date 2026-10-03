@@ -15,6 +15,26 @@
 #define CDC_INTERFACE_STR_INDEX	    0xE2
 #define CDC_INTERFACE_STRING_FS	    "Serial Interface"
 
+/*---------------------------------------------------------------------*/
+/*  CDC definitions                                                    */
+/*---------------------------------------------------------------------*/
+#define CDC_SEND_ENCAPSULATED_COMMAND               0x00U
+#define CDC_GET_ENCAPSULATED_RESPONSE               0x01U
+#define CDC_SET_COMM_FEATURE                        0x02U
+#define CDC_GET_COMM_FEATURE                        0x03U
+#define CDC_CLEAR_COMM_FEATURE                      0x04U
+#define CDC_SET_LINE_CODING                         0x20U
+#define CDC_GET_LINE_CODING                         0x21U
+#define CDC_SET_CONTROL_LINE_STATE                  0x22U
+#define CDC_SEND_BREAK                              0x23U
+
+typedef struct {
+    uint32_t bitrate;
+    uint8_t format;
+    uint8_t paritytype;
+    uint8_t datatype;
+} USBD_CDC_LineCodingTypeDef;
+
 /* Nonblocking, copied TX: 0..64 bytes, USBD_BUSY means retry later.
  * Read returns bytes consumed; unread data NAKs the host instead of dropping.
  * Call from the main loop. Buffers may be reused immediately after return. */
