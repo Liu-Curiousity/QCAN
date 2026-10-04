@@ -61,6 +61,8 @@ public:
 
     uint8_t SOF(USBD_HandleTypeDef *pdev);
 
+    uint8_t Control(uint8_t bRequest, uint16_t wValue);
+
     /* Composite control callbacks are broadcast. Only handle gs_usb vendor
      * requests, retaining support for device-recipient requests. */
     static bool IsRequest(const USBD_SetupReqTypedef *req) {
@@ -74,6 +76,10 @@ private:
     union ep0 {
         // Device -> Host
         gs_device_state state;
+        gs_device_bt_const bt_const;
+        gs_device_bt_const_extended bt_const_ext;
+        gs_device_config dev_config;
+        uint32_t timestamp;
 
         // Host -> Device
         gs_host_config config;
@@ -85,12 +91,16 @@ private:
         gs_device_termination_state term_state;
 
         alignas(4) uint8_t buf[std::max({
-            sizeof(gs_device_state),
-            sizeof(gs_host_config),
-            sizeof(gs_device_bittiming),
-            sizeof(gs_device_mode),
-            sizeof(gs_identify_mode),
-            sizeof(gs_device_termination_state)
+            sizeof(state),
+            sizeof(bt_const),
+            sizeof(bt_const_ext),
+            sizeof(dev_config),
+            sizeof(timestamp),
+            sizeof(config),
+            sizeof(bittiming),
+            sizeof(mode),
+            sizeof(identify_mode),
+            sizeof(term_state),
         })];
     } ep0{};
 
@@ -100,7 +110,7 @@ private:
     bool to_host_sending{false};
 
     // device info
-    const gs_device_config USBD_GS_CAN_dconf = {
+    const gs_device_config dev_config = {
         .icount = NUM_CAN_CHANNEL - 1,
         .sw_version = 2,
         .hw_version = 1,
