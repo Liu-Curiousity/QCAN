@@ -1,5 +1,9 @@
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include "usbd_def.h"
 
 #define CDC_CONTROL_INTERFACE       2
@@ -35,6 +39,42 @@ typedef struct {
     uint8_t datatype;
 } USBD_CDC_LineCodingTypeDef;
 
+extern USBD_ClassTypeDef USBD_CDC;
+
+#ifdef __cplusplus
+}
+
+#include <algorithm>
+
+class USBD_CDC_HandleTypeDef {
+public:
+    uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+
+    uint8_t DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
+
+    uint8_t Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req);
+
+    uint8_t EP0_RxReady(USBD_HandleTypeDef *pdev);
+
+    uint8_t Control(uint8_t bRequest, uint16_t wValue);
+
+private:
+    union ep0 {
+        // Device -> Host
+
+        // Host -> Device
+
+        // Device <-> Host
+        USBD_CDC_LineCodingTypeDef line_coding;
+
+        alignas(4) uint8_t buf[std::max({
+            sizeof(line_coding),
+        })];
+    } ep0{};
+
+    USBD_SetupReqTypedef last_setup_request{};
+};
+
 /* Nonblocking, copied TX: 0..64 bytes, USBD_BUSY means retry later.
  * Read returns bytes consumed; unread data NAKs the host instead of dropping.
  * Call from the main loop. Buffers may be reused immediately after return. */
@@ -43,4 +83,4 @@ uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity);
 /* Bit 0 = DTR, bit 1 = RTS; line coding is virtual (no UART reconfiguration). */
 uint16_t CDC_GetControlLineState_FS(void);
 
-extern USBD_ClassTypeDef USBD_CDC;
+#endif
