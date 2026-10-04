@@ -36,93 +36,16 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgi
 uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
     if (!IsRequest(req)) return USBD_OK;
 
-    CAN_Channel *channel = nullptr;
-    const void *src = nullptr;
-    size_t len;
-
-    if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
-        channel = GetChannel(req->wValue);
-        if (!channel) {
-            goto out_fail;
-        }
-    }
-
-    if (!IS_ENABLED(CONFIG_CANFD)) {
-        switch (req->bRequest) {
-            case GS_USB_BREQ_DATA_BITTIMING:
-            case GS_USB_BREQ_BT_CONST_EXT:
-                goto out_fail;
-        }
-    }
-
-    if (!IS_ENABLED(CONFIG_TERMINATION)) {
-        switch (req->bRequest) {
-            case GS_USB_BREQ_SET_TERMINATION:
-            case GS_USB_BREQ_GET_TERMINATION:
-                goto out_fail;
-        }
-    }
-
-    switch (req->bRequest) {
-        // Host -> Device
-        case GS_USB_BREQ_HOST_FORMAT:
-            len = sizeof(ep0.config);
-            break;
-        case GS_USB_BREQ_BITTIMING:
-            len = sizeof(ep0.bittiming);
-            break;
-        case GS_USB_BREQ_MODE:
-            len = sizeof(ep0.mode);
-            break;
-        case GS_USB_BREQ_BT_CONST:
-            src = &channel->bt_const;
-            len = sizeof(channel->bt_const);
-            break;
-        case GS_USB_BREQ_DEVICE_CONFIG:
-            src = &USBD_GS_CAN_dconf;
-            len = sizeof(USBD_GS_CAN_dconf);
-            break;
-        case GS_USB_BREQ_TIMESTAMP:
-            src = &sof_timestamp_us;
-            len = sizeof(sof_timestamp_us);
-            break;
-        case GS_USB_BREQ_IDENTIFY:
-            len = sizeof(ep0.identify_mode);
-            break;
-        case GS_USB_BREQ_DATA_BITTIMING:
-            len = sizeof(ep0.bittiming);
-            break;
-        case GS_USB_BREQ_BT_CONST_EXT:
-            src = &channel->bt_const_ext;
-            len = sizeof(channel->bt_const_ext);
-            break;
-        case GS_USB_BREQ_SET_TERMINATION:
-            len = sizeof(ep0.term_state);
-            break;
-        case GS_USB_BREQ_GET_TERMINATION:
-            // TODO: 后续支持
-            ep0.term_state.state = GS_CAN_TERMINATION_UNSUPPORTED;
-            src = &ep0.term_state;
-            len = sizeof(ep0.term_state);
-            break;
-        case GS_USB_BREQ_GET_STATE:
-            ep0.state = channel->get_device_state();
-            src = &ep0.state;
-            len = sizeof(ep0.state);
-            break;
-        default:
-            goto out_fail;
-    }
-
-    if (req->wLength < len) {
-        goto out_fail;
-    }
-
     if ((req->bmRequest & 0x80U) != 0U) {
-        USBD_CtlSendData(pdev, (uint8_t *)src, len);
+        if (Control(req->bRequest, req->wValue) != USBD_OK) {
+            USBD_CtlError(pdev, req);
+            return USBD_FAIL;
+        }
+        USBD_CtlSendData(pdev, ep0.buf, req->wLength);
     } else {
         if (req->wLength > sizeof(ep0)) {
-            goto out_fail;
+            USBD_CtlError(pdev, req);
+            return USBD_FAIL;
         }
 
         last_setup_request = *req;
@@ -130,10 +53,6 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReq
     }
 
     return USBD_OK;
-
-out_fail:
-    USBD_CtlError(pdev, req);
-    return USBD_FAIL;
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
@@ -142,7 +61,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
 
     USBD_SetupReqTypedef *req = &last_setup_request;
 
-    ret = Control(req->bRequest, req->wValue, req->wLength);
+    ret = Control(req->bRequest, req->wValue);
 
     req->bRequest = 0xFF;
     return ret;
@@ -213,7 +132,7 @@ USBD_ClassTypeDef USBD_GS_CAN = {
     },
 };
 
-uint8_t USBD_GS_CAN_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue, uint16_t wLength) {
+uint8_t USBD_GS_CAN_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
     CAN_Channel *channel = nullptr;
     if (!(bRequest == GS_USB_BREQ_HOST_FORMAT || bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
         channel = GetChannel(wValue);
@@ -233,10 +152,9 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue, ui
              * this feature and exchanges the data in little endian byte order.
              */
             break;
-        case GS_USB_BREQ_BITTIMING: {
+        case GS_USB_BREQ_BITTIMING:
             if (!channel->set_bittiming(&ep0.bittiming)) return USBD_FAIL;
             break;
-        }
         case GS_USB_BREQ_MODE: {
             const gs_device_mode *mode = &ep0.mode;
 
@@ -247,26 +165,47 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue, ui
             }
             break;
         }
-        case GS_USB_BREQ_IDENTIFY: {
+        case GS_USB_BREQ_BT_CONST:
+            ep0.bt_const = channel->bt_const;
+            break;
+        case GS_USB_BREQ_DEVICE_CONFIG:
+            ep0.dev_config = dev_config;
+            break;
+        case GS_USB_BREQ_TIMESTAMP:
+            ep0.timestamp = sof_timestamp_us;
+            break;
+        case GS_USB_BREQ_IDENTIFY:
             if (ep0.identify_mode.mode) {
                 channel->led.mode = signal_led::Mode::CONTINUES;
             } else {
                 channel->led.mode = channel->is_enabled() ? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
             }
             break;
-        }
-        case GS_USB_BREQ_DATA_BITTIMING: {
+        case GS_USB_BREQ_DATA_BITTIMING:
+            if constexpr (!IS_ENABLED(CONFIG_CANFD)) return USBD_FAIL;
             if (!channel->set_data_bittiming(&ep0.bittiming)) return USBD_FAIL;
             break;
-        }
-        case GS_USB_BREQ_SET_TERMINATION: {
+        case GS_USB_BREQ_BT_CONST_EXT:
+            if constexpr (!IS_ENABLED(CONFIG_CANFD)) return USBD_FAIL;
+            ep0.bt_const_ext = channel->bt_const_ext;
+            break;
+        case GS_USB_BREQ_SET_TERMINATION:
+            if constexpr (!IS_ENABLED(CONFIG_TERMINATION)) return USBD_FAIL;
             // TODO: 后续支持
             // set_term(channel, (gs_can_termination_state)ep0.term_state.state);
             break;
-        }
+        case GS_USB_BREQ_GET_TERMINATION:
+            if constexpr (!IS_ENABLED(CONFIG_TERMINATION)) return USBD_FAIL;
+            // TODO: 后续支持
+            ep0.term_state.state = GS_CAN_TERMINATION_UNSUPPORTED;
+            break;
+        case GS_USB_BREQ_GET_STATE:
+            ep0.state = channel->get_device_state();
+            break;
         default:
             break;
     }
+    return USBD_OK;
 }
 
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev) {
