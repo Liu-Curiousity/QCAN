@@ -137,86 +137,15 @@ out_fail:
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
-    /* Use the current transfer, not a saved request from a previous CAN write. */
+    uint8_t ret = USBD_OK;
     if (!IsRequest(&pdev->request)) return USBD_OK;
 
-    CAN_Channel *channel = nullptr;
     USBD_SetupReqTypedef *req = &last_setup_request;
 
-    if (!(req->bRequest == GS_USB_BREQ_HOST_FORMAT || req->bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
-        channel = GetChannel(req->wValue);
-        if (!channel) {
-            goto out_fail;
-        }
-    }
-
-    if (!IS_ENABLED(CONFIG_CANFD)) {
-        switch (req->bRequest) {
-            case GS_USB_BREQ_DATA_BITTIMING:
-                goto out_fail;
-        }
-    }
-
-    if (!IS_ENABLED(CONFIG_TERMINATION)) {
-        switch (req->bRequest) {
-            case GS_USB_BREQ_SET_TERMINATION:
-                goto out_fail;
-        }
-    }
-
-    switch (req->bRequest) {
-        case GS_USB_BREQ_HOST_FORMAT:
-            /*
-             * The firmware on the original USB2CAN by Geschwister Schneider
-             * Technologie Entwicklungs- und Vertriebs UG exchanges all data
-             * between the host and the device in host byte order. This is done
-             * with the struct gs_host_config::byte_order member, which is sent
-             * first to indicate the desired byte order.
-             *
-             * The widely used open source firmware candleLight doesn't support
-             * this feature and exchanges the data in little endian byte order.
-             */
-            break;
-        case GS_USB_BREQ_BITTIMING: {
-            if (!channel->set_bittiming(&ep0.bittiming)) goto out_fail;
-            break;
-        }
-        case GS_USB_BREQ_MODE: {
-            const gs_device_mode *mode = &ep0.mode;
-
-            if (mode->mode == GS_CAN_MODE_RESET) {
-                channel->disable();
-            } else if (mode->mode == GS_CAN_MODE_START) {
-                if (!channel->enable(mode->feature)) goto out_fail;
-            }
-            break;
-        }
-        case GS_USB_BREQ_IDENTIFY: {
-            if (ep0.identify_mode.mode) {
-                channel->led.mode = signal_led::Mode::CONTINUES;
-            } else {
-                channel->led.mode = channel->is_enabled() ? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
-            }
-            break;
-        }
-        case GS_USB_BREQ_DATA_BITTIMING: {
-            if (!channel->set_data_bittiming(&ep0.bittiming)) goto out_fail;
-            break;
-        }
-        case GS_USB_BREQ_SET_TERMINATION: {
-            // TODO: 后续支持
-            // set_term(channel, (gs_can_termination_state)ep0.term_state.state);
-            break;
-        }
-        default:
-            break;
-    }
+    ret = Control(req->bRequest, req->wValue, req->wLength);
 
     req->bRequest = 0xFF;
-    return USBD_OK;
-
-out_fail:
-    return USBD_FAIL;
+    return ret;
 }
 
 uint8_t USBD_GS_CAN_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
@@ -259,6 +188,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::SOF(USBD_HandleTypeDef *pdev) {
     return USBD_OK;
 }
 
+
 USBD_ClassTypeDef USBD_GS_CAN = {
     .Init = [](USBD_HandleTypeDef *pdev, uint8_t cfgidx) -> uint8_t {
         return hGS_CAN.Init(pdev, cfgidx);
@@ -282,6 +212,62 @@ USBD_ClassTypeDef USBD_GS_CAN = {
         return hGS_CAN.SOF(pdev);
     },
 };
+
+uint8_t USBD_GS_CAN_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue, uint16_t wLength) {
+    CAN_Channel *channel = nullptr;
+    if (!(bRequest == GS_USB_BREQ_HOST_FORMAT || bRequest == GS_USB_BREQ_DEVICE_CONFIG)) {
+        channel = GetChannel(wValue);
+        if (!channel) return USBD_FAIL;
+    }
+
+    switch (bRequest) {
+        case GS_USB_BREQ_HOST_FORMAT:
+            /*
+             * The firmware on the original USB2CAN by Geschwister Schneider
+             * Technologie Entwicklungs- und Vertriebs UG exchanges all data
+             * between the host and the device in host byte order. This is done
+             * with the struct gs_host_config::byte_order member, which is sent
+             * first to indicate the desired byte order.
+             *
+             * The widely used open source firmware candleLight doesn't support
+             * this feature and exchanges the data in little endian byte order.
+             */
+            break;
+        case GS_USB_BREQ_BITTIMING: {
+            if (!channel->set_bittiming(&ep0.bittiming)) return USBD_FAIL;
+            break;
+        }
+        case GS_USB_BREQ_MODE: {
+            const gs_device_mode *mode = &ep0.mode;
+
+            if (mode->mode == GS_CAN_MODE_RESET) {
+                channel->disable();
+            } else if (mode->mode == GS_CAN_MODE_START) {
+                if (!channel->enable(mode->feature)) return USBD_FAIL;
+            }
+            break;
+        }
+        case GS_USB_BREQ_IDENTIFY: {
+            if (ep0.identify_mode.mode) {
+                channel->led.mode = signal_led::Mode::CONTINUES;
+            } else {
+                channel->led.mode = channel->is_enabled() ? signal_led::Mode::NORMAL : signal_led::Mode::OFF;
+            }
+            break;
+        }
+        case GS_USB_BREQ_DATA_BITTIMING: {
+            if (!channel->set_data_bittiming(&ep0.bittiming)) return USBD_FAIL;
+            break;
+        }
+        case GS_USB_BREQ_SET_TERMINATION: {
+            // TODO: 后续支持
+            // set_term(channel, (gs_can_termination_state)ep0.term_state.state);
+            break;
+        }
+        default:
+            break;
+    }
+}
 
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev) {
     // hGS_CAN.PrepareReceive(pdev);

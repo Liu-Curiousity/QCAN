@@ -61,6 +61,8 @@ public:
 
     uint8_t SOF(USBD_HandleTypeDef *pdev);
 
+    uint8_t Control(uint8_t bRequest, uint16_t wValue, uint16_t wLength);
+
     /* Composite control callbacks are broadcast. Only handle gs_usb vendor
      * requests, retaining support for device-recipient requests. */
     static bool IsRequest(const USBD_SetupReqTypedef *req) {
@@ -82,6 +84,8 @@ private:
 
         // Device <-> Host
         gs_device_termination_state term_state;
+        gs_device_bt_const bt_const;
+        gs_device_config dev_config;
 
         alignas(4) uint8_t buf[std::max({
             sizeof(gs_device_state),
@@ -89,7 +93,9 @@ private:
             sizeof(gs_device_bittiming),
             sizeof(gs_device_mode),
             sizeof(gs_identify_mode),
-            sizeof(gs_device_termination_state)
+            sizeof(gs_device_termination_state),
+            sizeof(gs_device_bt_const),
+            sizeof(gs_device_config)
         })];
     } ep0{};
 
