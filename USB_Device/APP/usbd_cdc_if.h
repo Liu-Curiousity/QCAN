@@ -56,7 +56,13 @@ public:
 
     uint8_t EP0_RxReady(USBD_HandleTypeDef *pdev);
 
+    uint8_t DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum);
+
+    uint8_t DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum);
+
     uint8_t Control(uint8_t bRequest, uint16_t wValue);
+
+    uint8_t CDC_Transmit_FS(uint8_t *buffer, uint16_t length);
 
 private:
     union ep0 {
@@ -72,6 +78,13 @@ private:
         })];
     } ep0{};
 
+    bool transmitting{false};
+    bool zlp_request{false};
+    uint8_t rx_buffer[CDC_DATA_MAX_PACKET_SIZE]{};
+    USBD_HandleTypeDef *device;
+
+    USBD_CDC_LineCodingTypeDef line_coding{.bitrate = 115200, .format = 0, .paritytype = 0, .datatype = 8};
+
     USBD_SetupReqTypedef last_setup_request{};
 };
 
@@ -79,8 +92,5 @@ private:
  * Read returns bytes consumed; unread data NAKs the host instead of dropping.
  * Call from the main loop. Buffers may be reused immediately after return. */
 uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length);
-uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity);
-/* Bit 0 = DTR, bit 1 = RTS; line coding is virtual (no UART reconfiguration). */
-uint16_t CDC_GetControlLineState_FS(void);
 
 #endif

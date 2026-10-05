@@ -1,26 +1,9 @@
 #include "usbd_cdc_if.h"
 #include "usbd_core.h"
-#include "usbd_ctlreq.h"
-#include "usbd_ioreq.h"
-#include "stdbool.h"
-#include "util.h"
-#include <string.h>
-
-static USBD_HandleTypeDef *device;
-static uint8_t rx_buffer[CDC_DATA_MAX_PACKET_SIZE];
-static uint8_t tx_buffer[CDC_DATA_MAX_PACKET_SIZE];
-static USBD_CDC_LineCodingTypeDef pending_line_coding[7];
-static uint16_t rx_length{0}, rx_offset{0}, control_lines{0};
-static bool tx_busy{false}, tx_zlp{false};
-static uint8_t alternate_setting;
-static uint16_t interface_status;
-static USBD_CDC_LineCodingTypeDef line_coding{.bitrate = 115200, .format = 0, .paritytype = 0, .datatype = 8};
 
 USBD_CDC_HandleTypeDef hCDC;
 
 uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
-    rx_length = rx_offset = control_lines = 0;
-    tx_busy = tx_zlp = false;
     USBD_LL_OpenEP(pdev, CDC_IN_EP, USBD_EP_TYPE_BULK, CDC_DATA_MAX_PACKET_SIZE);
     USBD_LL_OpenEP(pdev, CDC_OUT_EP, USBD_EP_TYPE_BULK, CDC_DATA_MAX_PACKET_SIZE);
     USBD_LL_OpenEP(pdev, CDC_CMD_EP, USBD_EP_TYPE_INTR, CDC_CMD_PACKET_SIZE);
@@ -33,15 +16,14 @@ uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 }
 
 uint8_t USBD_CDC_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
-    device = NULL;
+    device = pdev;
     USBD_LL_CloseEP(pdev, CDC_IN_EP);
     USBD_LL_CloseEP(pdev, CDC_OUT_EP);
     USBD_LL_CloseEP(pdev, CDC_CMD_EP);
     pdev->ep_in[CDC_IN_EP & 0xFU].is_used = 0;
     pdev->ep_out[CDC_OUT_EP & 0xFU].is_used = 0;
     pdev->ep_in[CDC_CMD_EP & 0xFU].is_used = 0;
-    rx_length = rx_offset = control_lines = 0;
-    tx_busy = tx_zlp = false;
+    transmitting = zlp_request = false;
     return USBD_OK;
 }
 
@@ -94,28 +76,27 @@ uint8_t USBD_CDC_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
     return ret;
 }
 
-static uint8_t USBD_CDC_DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+uint8_t USBD_CDC_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != (CDC_IN_EP & EP_ADDR_MSK)) return USBD_OK;
 
-    if (tx_zlp) {
-        tx_zlp = false;
-        uint8_t result = USBD_LL_Transmit(pdev, CDC_IN_EP, tx_buffer, 0);
-        if (result != USBD_OK)
-            tx_busy = false;
-        return result;
+    if (zlp_request) {
+        zlp_request = false;
+        USBD_LL_Transmit(pdev, epnum, NULL, 0U);
+    } else {
+        transmitting = false;
+        // TODO:发送完成回调
     }
-    tx_busy = false;
     return USBD_OK;
 }
 
-static uint8_t USBD_CDC_DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
+uint8_t USBD_CDC_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != (CDC_OUT_EP & EP_ADDR_MSK)) return USBD_OK;
 
-    rx_offset = 0;
-    rx_length = (uint16_t)USBD_LL_GetRxDataSize(pdev, CDC_OUT_EP);
-    if (rx_length == 0)
-        return USBD_LL_PrepareReceive(pdev, CDC_OUT_EP, rx_buffer, sizeof(rx_buffer));
-    /* Leave OUT NAKed until the application consumes this packet. */
+    // TODO:处理接收到的数据
+    // CDC_Read_FS(rx_buffer, USBD_LL_GetRxDataSize(pdev, epnum));
+
+    USBD_LL_PrepareReceive(pdev, CDC_OUT_EP, rx_buffer, CDC_DATA_MAX_PACKET_SIZE);
+
     return USBD_OK;
 }
 
@@ -132,16 +113,20 @@ USBD_ClassTypeDef USBD_CDC = {
     .EP0_RxReady = [](USBD_HandleTypeDef *pdev) -> uint8_t {
         return hCDC.EP0_RxReady(pdev);
     },
-    .DataIn = USBD_CDC_DataIn,
-    .DataOut = USBD_CDC_DataOut,
+    .DataIn = [](USBD_HandleTypeDef *pdev, uint8_t epnum) -> uint8_t {
+        return hCDC.DataIn(pdev, epnum);
+    },
+    .DataOut = [](USBD_HandleTypeDef *pdev, uint8_t epnum) -> uint8_t {
+        return hCDC.DataOut(pdev, epnum);
+    },
 };
 
 uint8_t USBD_CDC_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
     switch (bRequest) {
         case CDC_SET_LINE_CODING:
             line_coding = ep0.line_coding;
-        case CDC_SET_CONTROL_LINE_STATE:
-
+        case CDC_GET_LINE_CODING:
+            ep0.line_coding = line_coding;
         default:
             return USBD_OK;
             break;
@@ -149,52 +134,14 @@ uint8_t USBD_CDC_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
     return USBD_OK;
 }
 
-uint16_t CDC_Read_FS(uint8_t *buffer, uint16_t capacity) {
-    if (buffer == NULL || capacity == 0)
-        return 0;
-    bool irq = disable_irq();
-    uint16_t length = rx_length - rx_offset;
-    if (length > capacity)
-        length = capacity;
-    if (device != NULL && device->dev_state == USBD_STATE_CONFIGURED && length != 0) {
-        memcpy(buffer, &rx_buffer[rx_offset], length);
-        rx_offset += length;
-        if (rx_offset == rx_length) {
-            rx_length = rx_offset = 0;
-            USBD_LL_PrepareReceive(device, CDC_OUT_EP, rx_buffer, sizeof(rx_buffer));
-        }
-    } else {
-        length = 0;
-    }
-    restore_irq(irq);
-    return length;
-}
-
-uint8_t CDC_Transmit_FS(const uint8_t *buffer, uint16_t length) {
-    if (length > CDC_DATA_MAX_PACKET_SIZE || (buffer == NULL && length != 0))
+uint8_t USBD_CDC_HandleTypeDef::CDC_Transmit_FS(uint8_t *buffer, uint16_t length) {
+    if (length > CDC_DATA_MAX_PACKET_SIZE || (buffer == nullptr && length != 0))
         return USBD_FAIL;
-    bool irq = disable_irq();
-    uint8_t result = USBD_FAIL;
-    if (device != NULL && device->dev_state == USBD_STATE_CONFIGURED) {
-        result = USBD_BUSY;
-        if (!tx_busy) {
-            if (length != 0)
-                memcpy(tx_buffer, buffer, length);
-            tx_busy = true;
-            tx_zlp = length == CDC_DATA_MAX_PACKET_SIZE;
-            result = USBD_LL_Transmit(device, CDC_IN_EP, tx_buffer, length);
-            if (result != USBD_OK)
-                tx_busy = tx_zlp = false;
-        }
+
+    if (!transmitting) {
+        transmitting = true;
+        if (length % CDC_DATA_MAX_PACKET_SIZE == 0U) zlp_request = true;
+        return USBD_LL_Transmit(device, CDC_IN_EP, buffer, length);
     }
-    restore_irq(irq);
-    return result;
-}
-
-
-uint16_t CDC_GetControlLineState_FS(void) {
-    bool irq = disable_irq();
-    uint16_t result = control_lines;
-    restore_irq(irq);
-    return result;
+    return USBD_BUSY;
 }
