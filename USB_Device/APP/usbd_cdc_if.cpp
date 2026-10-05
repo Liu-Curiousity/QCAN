@@ -147,7 +147,40 @@ uint8_t USBD_CDC_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
     switch (bRequest) {
         case CDC_SET_LINE_CODING:
             line_coding = ep0.line_coding;
-            break;
+
+            // CDC bDataBits describes data bits only.  On STM32F0, when
+            // parity is enabled, UART_WORDLENGTH includes the parity bit.
+            // Therefore 7/8 data bits require 8B/9B respectively.
+            if (line_coding.datatype < 7 || line_coding.datatype > 9 ||
+                (line_coding.datatype == 9 && line_coding.paritytype != 0) ||
+                line_coding.paritytype > 2 || line_coding.format > 2) {
+                return USBD_FAIL;
+            }
+
+            HAL_UART_DeInit(&huart1);
+            huart1.Init.BaudRate = line_coding.bitrate;
+            huart1.Init.StopBits =
+                line_coding.format == 0x00 ? UART_STOPBITS_1 :
+                line_coding.format == 0x01 ? UART_STOPBITS_1_5 :
+                line_coding.format == 0x02 ? UART_STOPBITS_2 :
+                UART_STOPBITS_1;
+            huart1.Init.Parity =
+                line_coding.paritytype == 0x00 ? UART_PARITY_NONE :
+                line_coding.paritytype == 0x01 ? UART_PARITY_ODD :
+                line_coding.paritytype == 0x02 ? UART_PARITY_EVEN :
+                UART_PARITY_NONE;
+            huart1.Init.WordLength =
+                line_coding.datatype == 0x07 ?
+                (line_coding.paritytype != 0 ? UART_WORDLENGTH_8B : UART_WORDLENGTH_7B) :
+                line_coding.datatype == 0x08 ?
+                (line_coding.paritytype != 0 ? UART_WORDLENGTH_9B : UART_WORDLENGTH_8B) :
+                UART_WORDLENGTH_9B;
+            if (HAL_UART_Init(&huart1) != HAL_OK) {
+                Error_Handler();
+            }
+            // 软件触发进HAL_UART_ErrorCallback
+            HAL_UART_ErrorCallback(&huart1);
+            return USBD_OK;
         case CDC_GET_LINE_CODING:
             ep0.line_coding = line_coding;
             break;
