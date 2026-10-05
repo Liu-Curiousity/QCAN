@@ -45,9 +45,14 @@ extern USBD_ClassTypeDef USBD_CDC;
 }
 
 #include <algorithm>
+#include "led.h"
 
 class USBD_CDC_HandleTypeDef {
 public:
+    explicit USBD_CDC_HandleTypeDef(signal_led& led) : led(led) {}
+
+    signal_led& led;
+
     uint8_t Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
 
     uint8_t DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx);
@@ -81,7 +86,7 @@ private:
     bool transmitting{false};
     bool zlp_request{false};
     uint8_t rx_buffer[CDC_DATA_MAX_PACKET_SIZE]{};
-    USBD_HandleTypeDef *device;
+    USBD_HandleTypeDef *device{};
 
     USBD_CDC_LineCodingTypeDef line_coding{.bitrate = 115200, .format = 0, .paritytype = 0, .datatype = 8};
 

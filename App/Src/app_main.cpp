@@ -1,13 +1,10 @@
 #include "can.h"
-#include "usbd_composite.h"
-#include "can_common.h"
-#include "led.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
+#include "usbd_composite.h"
 #include "usbd_gs_can.h"
+#include "usbd_cdc_if.h"
 #include "timer.h"
-#include <cstring>
-#include "util.h"
 
 extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
@@ -17,6 +14,8 @@ static signal_led led{
     {LED_RX_GPIO_Port, LED_RX_Pin, true},
     {LED_TX_GPIO_Port, LED_TX_Pin, true}
 };
+
+USBD_CDC_HandleTypeDef hCDC{led};
 
 static bxcan_ can_channel_0{
     0,

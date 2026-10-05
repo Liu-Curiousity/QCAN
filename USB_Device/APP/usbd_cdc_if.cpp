@@ -1,7 +1,7 @@
 #include "usbd_cdc_if.h"
 #include "usbd_core.h"
 
-USBD_CDC_HandleTypeDef hCDC;
+extern USBD_CDC_HandleTypeDef hCDC;
 
 uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_OpenEP(pdev, CDC_IN_EP, USBD_EP_TYPE_BULK, CDC_DATA_MAX_PACKET_SIZE);
@@ -93,6 +93,7 @@ uint8_t USBD_CDC_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
     if (epnum != (CDC_OUT_EP & EP_ADDR_MSK)) return USBD_OK;
 
     // TODO:处理接收到的数据
+    led.blink_request(signal_led::LED_TX);
     // CDC_Read_FS(rx_buffer, USBD_LL_GetRxDataSize(pdev, epnum));
 
     USBD_LL_PrepareReceive(pdev, CDC_OUT_EP, rx_buffer, CDC_DATA_MAX_PACKET_SIZE);
@@ -140,6 +141,7 @@ uint8_t USBD_CDC_HandleTypeDef::CDC_Transmit_FS(uint8_t *buffer, uint16_t length
 
     if (!transmitting) {
         transmitting = true;
+        led.blink_request(signal_led::LED_RX);
         if (length % CDC_DATA_MAX_PACKET_SIZE == 0U) zlp_request = true;
         return USBD_LL_Transmit(device, CDC_IN_EP, buffer, length);
     }
