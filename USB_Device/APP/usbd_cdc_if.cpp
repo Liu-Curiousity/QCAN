@@ -1,7 +1,23 @@
 #include "usbd_cdc_if.h"
 #include "usbd_core.h"
+#include "DualBuffer.h"
+#include "usart.h"
 
 extern USBD_CDC_HandleTypeDef hCDC;
+
+static uint8_t uart_rx_buffer[64];
+
+TxDualBuffer<uint8_t, 512> device_to_host{
+    [](uint8_t *buffer, uint16_t length) -> uint8_t {
+        return hCDC.CDC_Transmit_FS(buffer, length);
+    }
+};
+
+TxDualBuffer<uint8_t, 512> host_to_device{
+    [](uint8_t *buffer, uint16_t length) -> uint8_t {
+        return HAL_UART_Transmit_DMA(&huart1, buffer, length);
+    }
+};
 
 uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_OpenEP(pdev, CDC_IN_EP, USBD_EP_TYPE_BULK, CDC_DATA_MAX_PACKET_SIZE);
@@ -11,12 +27,14 @@ uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     pdev->ep_out[CDC_OUT_EP & 0xFU].is_used = 1U;
     pdev->ep_in[CDC_CMD_EP & 0xFU].is_used = 1U;
     USBD_LL_PrepareReceive(pdev, CDC_OUT_EP, rx_buffer, CDC_DATA_MAX_PACKET_SIZE);
+    HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_buffer, sizeof(uart_rx_buffer));
     device = pdev;
     return USBD_OK;
 }
 
 uint8_t USBD_CDC_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     device = nullptr;
+    HAL_UART_AbortReceive_IT(&huart1);
     USBD_LL_CloseEP(pdev, CDC_IN_EP);
     USBD_LL_CloseEP(pdev, CDC_OUT_EP);
     USBD_LL_CloseEP(pdev, CDC_CMD_EP);
@@ -85,7 +103,8 @@ uint8_t USBD_CDC_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) 
         USBD_LL_Transmit(pdev, epnum, NULL, 0U);
     } else {
         transmitting = false;
-        // TODO:发送完成回调
+        // 发送完成回调
+        device_to_host.transmitComplete();
     }
     return USBD_OK;
 }
@@ -95,7 +114,7 @@ uint8_t USBD_CDC_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum)
 
     // TODO:处理接收到的数据
     led.blink_request(signal_led::LED_TX);
-    // CDC_Read_FS(rx_buffer, USBD_LL_GetRxDataSize(pdev, epnum));
+    host_to_device.inBuffer(rx_buffer, USBD_LL_GetRxDataSize(pdev, epnum));
 
     USBD_LL_PrepareReceive(pdev, CDC_OUT_EP, rx_buffer, CDC_DATA_MAX_PACKET_SIZE);
 
@@ -149,4 +168,13 @@ uint8_t USBD_CDC_HandleTypeDef::CDC_Transmit_FS(uint8_t *buffer, uint16_t length
         return USBD_LL_Transmit(device, CDC_IN_EP, buffer, length);
     }
     return USBD_BUSY;
+}
+
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
+    host_to_device.transmitComplete();
+}
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+    device_to_host.inBuffer(uart_rx_buffer, Size);
+    HAL_UARTEx_ReceiveToIdle_DMA(huart, uart_rx_buffer, sizeof(uart_rx_buffer));
 }
