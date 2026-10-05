@@ -28,6 +28,7 @@ uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     pdev->ep_in[CDC_CMD_EP & 0xFU].is_used = 1U;
     USBD_LL_PrepareReceive(pdev, CDC_OUT_EP, rx_buffer, CDC_DATA_MAX_PACKET_SIZE);
     HAL_UARTEx_ReceiveToIdle_DMA(&huart1, uart_rx_buffer, sizeof(uart_rx_buffer));
+    __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
     device = pdev;
     return USBD_OK;
 }
@@ -171,10 +172,23 @@ uint8_t USBD_CDC_HandleTypeDef::CDC_Transmit_FS(uint8_t *buffer, uint16_t length
 }
 
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
-    host_to_device.transmitComplete();
+    if (huart == &huart1) {
+        host_to_device.transmitComplete();
+    }
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
-    device_to_host.inBuffer(uart_rx_buffer, Size);
-    HAL_UARTEx_ReceiveToIdle_DMA(huart, uart_rx_buffer, sizeof(uart_rx_buffer));
+    if (huart == &huart1) {
+        device_to_host.inBuffer(uart_rx_buffer, Size);
+        HAL_UARTEx_ReceiveToIdle_DMA(huart, uart_rx_buffer, sizeof(uart_rx_buffer));
+        __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
+    }
+}
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
+    if (huart == &huart1) {
+        __HAL_UNLOCK(huart);
+        HAL_UARTEx_ReceiveToIdle_DMA(huart, uart_rx_buffer, sizeof(uart_rx_buffer));
+        __HAL_DMA_DISABLE_IT(huart1.hdmarx, DMA_IT_HT);
+    }
 }
