@@ -33,7 +33,7 @@
 
 class bxcan_ : public CAN_Channel {
 public:
-    bxcan_(const uint8_t nr, CAN_HandleTypeDef *hcan, const signal_led& led,
+    bxcan_(const uint8_t nr, CAN_HandleTypeDef *hcan, signal_led& led,
            const gs_device_bt_const& bt_const, gs_device_bt_const_extended bt_const_ext = {}) :
         CAN_Channel(nr, led, bt_const, bt_const_ext), hcan(hcan) {}
 

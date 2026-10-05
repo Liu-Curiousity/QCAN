@@ -6,7 +6,6 @@
 #include "usbd_desc.h"
 #include "usbd_gs_can.h"
 #include "timer.h"
-#include "queue"
 #include <cstring>
 #include "util.h"
 
@@ -14,13 +13,15 @@ extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
 
-bxcan_ can_channel_0{
+static signal_led led{
+    {LED_RX_GPIO_Port, LED_RX_Pin, true},
+    {LED_TX_GPIO_Port, LED_TX_Pin, true}
+};
+
+static bxcan_ can_channel_0{
     0,
     &hcan,
-    signal_led{
-        {LED_RX_GPIO_Port, LED_RX_Pin, true},
-        {LED_TX_GPIO_Port, LED_TX_Pin, true}
-    },
+    led,
     gs_device_bt_const{
         .feature =
         GS_CAN_FEATURE_LISTEN_ONLY |
