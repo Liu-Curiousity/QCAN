@@ -221,7 +221,7 @@ __ALIGN_BEGIN static uint8_t USBD_MS_OS_20_DESC[] __ALIGN_END = {
 	/* CAN function subset: 8 + 20 + 132 bytes. */
 	0x08, 0x00,							/* wLength */
 	0x02, 0x00,							/* wDescriptorType */
-	0x00,								/* bFirstInterface */
+	GS_CAN_INTERFACE_NUM,				/* bFirstInterface */
 	0x00,								/* bReserved */
 	0xA0, 0x00,							/* wSubsetLength */
 

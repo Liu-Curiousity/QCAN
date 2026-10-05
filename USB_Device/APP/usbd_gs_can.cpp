@@ -36,20 +36,27 @@ uint8_t USBD_GS_CAN_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgi
 uint8_t USBD_GS_CAN_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
     if (!IsRequest(req)) return USBD_OK;
 
-    if ((req->bmRequest & 0x80U) != 0U) {
+    if (req->wLength != 0U) {
+        if ((req->bmRequest & 0x80U) != 0U) {
+            if (Control(req->bRequest, req->wValue) != USBD_OK) {
+                USBD_CtlError(pdev, req);
+                return USBD_FAIL;
+            }
+            USBD_CtlSendData(pdev, ep0.buf, req->wLength);
+        } else {
+            if (req->wLength > sizeof(ep0)) {
+                USBD_CtlError(pdev, req);
+                return USBD_FAIL;
+            }
+
+            last_setup_request = *req;
+            USBD_CtlPrepareRx(pdev, ep0.buf, req->wLength);
+        }
+    } else {
         if (Control(req->bRequest, req->wValue) != USBD_OK) {
             USBD_CtlError(pdev, req);
             return USBD_FAIL;
         }
-        USBD_CtlSendData(pdev, ep0.buf, req->wLength);
-    } else {
-        if (req->wLength > sizeof(ep0)) {
-            USBD_CtlError(pdev, req);
-            return USBD_FAIL;
-        }
-
-        last_setup_request = *req;
-        USBD_CtlPrepareRx(pdev, ep0.buf, req->wLength);
     }
 
     return USBD_OK;
