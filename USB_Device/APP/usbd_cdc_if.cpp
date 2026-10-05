@@ -16,7 +16,7 @@ uint8_t USBD_CDC_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
 }
 
 uint8_t USBD_CDC_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
-    device = pdev;
+    device = nullptr;
     USBD_LL_CloseEP(pdev, CDC_IN_EP);
     USBD_LL_CloseEP(pdev, CDC_OUT_EP);
     USBD_LL_CloseEP(pdev, CDC_CMD_EP);
@@ -28,33 +28,34 @@ uint8_t USBD_CDC_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx)
 }
 
 uint8_t USBD_CDC_HandleTypeDef::Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
-    USBD_StatusTypeDef ret = USBD_OK;
-
     if (!((req->bmRequest & 0x1FU) == USB_REQ_RECIPIENT_INTERFACE &&
           (req->wIndex == CDC_CONTROL_INTERFACE || req->wIndex == CDC_DATA_INTERFACE)))
         return USBD_OK;
 
-    if ((req->bmRequest & 0x80U) != 0U) {
+    if (req->wLength != 0U) {
+        if ((req->bmRequest & 0x80U) != 0U) {
+            if (Control(req->bRequest, req->wValue) != USBD_OK) {
+                USBD_CtlError(pdev, req);
+                return USBD_FAIL;
+            }
+            USBD_CtlSendData(pdev, ep0.buf, req->wLength);
+        } else {
+            if (req->wLength > sizeof(ep0)) {
+                USBD_CtlError(pdev, req);
+                return USBD_FAIL;
+            }
+
+            last_setup_request = *req;
+            USBD_CtlPrepareRx(pdev, ep0.buf, req->wLength);
+        }
+    } else {
         if (Control(req->bRequest, req->wValue) != USBD_OK) {
             USBD_CtlError(pdev, req);
             return USBD_FAIL;
         }
-        USBD_CtlSendData(pdev, ep0.buf, req->wLength);
-    } else {
-        if (req->wLength > sizeof(ep0)) {
-            USBD_CtlError(pdev, req);
-            return USBD_FAIL;
-        }
-
-        last_setup_request = *req;
-        USBD_CtlPrepareRx(pdev, ep0.buf, req->wLength);
     }
 
-    return (uint8_t)ret;
-
-fail:
-    USBD_CtlError(pdev, req);
-    return USBD_FAIL;
+    return USBD_OK;
 }
 
 uint8_t USBD_CDC_HandleTypeDef::EP0_RxReady(USBD_HandleTypeDef *pdev) {
@@ -126,8 +127,10 @@ uint8_t USBD_CDC_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
     switch (bRequest) {
         case CDC_SET_LINE_CODING:
             line_coding = ep0.line_coding;
+            break;
         case CDC_GET_LINE_CODING:
             ep0.line_coding = line_coding;
+            break;
         default:
             return USBD_OK;
             break;
@@ -136,7 +139,7 @@ uint8_t USBD_CDC_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
 }
 
 uint8_t USBD_CDC_HandleTypeDef::CDC_Transmit_FS(uint8_t *buffer, uint16_t length) {
-    if (length > CDC_DATA_MAX_PACKET_SIZE || (buffer == nullptr && length != 0))
+    if (device == nullptr || (buffer == nullptr && length != 0))
         return USBD_FAIL;
 
     if (!transmitting) {
