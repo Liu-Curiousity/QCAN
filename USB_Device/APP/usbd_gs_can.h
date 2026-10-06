@@ -68,7 +68,8 @@ public:
     static bool IsRequest(const USBD_SetupReqTypedef *req) {
         return (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_VENDOR &&
                ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_DEVICE ||
-                ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE && req->wIndex == 0));
+                ((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&
+                 req->wIndex == GS_CAN_INTERFACE_NUM));
     }
 
 private:
