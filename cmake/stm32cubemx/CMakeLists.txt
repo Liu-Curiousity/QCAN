@@ -10,9 +10,9 @@ set(MX_Defines_Syms
 
 # STM32CubeMX generated include paths
 set(MX_Include_Dirs
-    ${CMAKE_SOURCE_DIR}/Core/Inc
-	${CMAKE_SOURCE_DIR}/USB_Device/App
-	${CMAKE_SOURCE_DIR}/USB_Device/Target
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Inc
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/Target
     C:/Users/26757/STM32Cube/Repository/STM32Cube_FW_F0_V1.11.6/Drivers/STM32F0xx_HAL_Driver/Inc
     C:/Users/26757/STM32Cube/Repository/STM32Cube_FW_F0_V1.11.6/Drivers/STM32F0xx_HAL_Driver/Inc/Legacy
     C:/Users/26757/STM32Cube/Repository/STM32Cube_FW_F0_V1.11.6/Drivers/CMSIS/Device/ST/STM32F0xx/Include
@@ -22,30 +22,30 @@ set(MX_Include_Dirs
 
 # STM32CubeMX generated application sources
 set(MX_Application_Src
-	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_dfu.c
-	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_gs_can.cpp
-	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_composite.c
-	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_cdc_if.cpp
-	${CMAKE_SOURCE_DIR}/USB_Device/App/usbd_desc.c
-	${CMAKE_SOURCE_DIR}/USB_Device/Target/usbd_conf.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/main.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/gpio.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/can.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/dma.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/i2c.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/tim.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/usart.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/usb.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/stm32f0xx_it.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/stm32f0xx_hal_msp.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/sysmem.c
-    ${CMAKE_SOURCE_DIR}/Core/Src/syscalls.c
-    ${CMAKE_SOURCE_DIR}/startup_stm32f072xb.s
+	${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usbd_dfu.c
+	${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usbd_gs_can.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usbd_composite.c
+	${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usbd_cdc_if.cpp
+	${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/App/usbd_desc.c
+	${CMAKE_CURRENT_SOURCE_DIR}/../../USB_Device/Target/usbd_conf.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/main.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/gpio.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/can.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/dma.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/i2c.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/tim.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/usart.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/usb.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f0xx_it.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/stm32f0xx_hal_msp.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/sysmem.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/syscalls.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../startup_stm32f072xb.s
 )
 
 # STM32 HAL/LL Drivers
 set(STM32_Drivers_Src
-    ${CMAKE_SOURCE_DIR}/Core/Src/system_stm32f0xx.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../Core/Src/system_stm32f0xx.c
     C:/Users/26757/STM32Cube/Repository/STM32Cube_FW_F0_V1.11.6/Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_ll_usb.c
     C:/Users/26757/STM32Cube/Repository/STM32Cube_FW_F0_V1.11.6/Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_can.c
     C:/Users/26757/STM32Cube/Repository/STM32Cube_FW_F0_V1.11.6/Drivers/STM32F0xx_HAL_Driver/Src/stm32f0xx_hal_rcc.c
@@ -86,7 +86,8 @@ set(MX_LINK_DIRS
 set(MX_LINK_LIBS 
     STM32_Drivers
 	USB_Device_Library
-
+    ${TOOLCHAIN_LINK_LIBRARIES}
+    
 )
 # Interface library for includes and symbols
 add_library(stm32cubemx INTERFACE)
