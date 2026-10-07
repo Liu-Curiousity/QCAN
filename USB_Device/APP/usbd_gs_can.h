@@ -13,7 +13,6 @@
 #ifndef QCAN_USBD_GS_USB_H
 #define QCAN_USBD_GS_USB_H
 
-#include "config.h"
 #include "usbd_def.h"
 
 #define GS_CAN_INTERFACE_NUM		 0
@@ -32,16 +31,31 @@
 #include <algorithm>
 #include "locked_queue.h"
 #include "can_common.h"
+#include <initializer_list>
 
 class USBD_GS_CAN_HandleTypeDef {
+    constexpr static auto QUEUE_SIZE = 96;
+
 public:
-    // template <std::size_t N>
-    explicit USBD_GS_CAN_HandleTypeDef(CAN_Channel& channels) :
-        channels(&channels), channel_count(1), sof_timestamp_us(0) {}
+    explicit USBD_GS_CAN_HandleTypeDef(const std::initializer_list<CAN_Channel *> pchannels) :
+        pchannels(new CAN_Channel *[pchannels.size()]),
+        channel_count(pchannels.size()),
+        sof_timestamp_us(0),
+        dev_config(gs_device_config{
+            .icount = static_cast<uint8_t>(pchannels.size() - 1),
+            .sw_version = 2,
+            .hw_version = 1,
+        }) {
+        std::copy(pchannels.begin(), pchannels.end(), this->pchannels);
+    }
 
-    queue_with_irq_lock<gs_host_frame_object> queue_to_host{96}; // 向主机发送帧的队列
+    ~USBD_GS_CAN_HandleTypeDef() {
+        delete[] pchannels;
+    }
 
-    CAN_Channel *channels;
+    queue_with_irq_lock<gs_host_frame_object> queue_to_host{QUEUE_SIZE}; // 向主机发送帧的队列
+
+    CAN_Channel **pchannels;
     size_t channel_count{};
 
     void USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev);
@@ -109,14 +123,10 @@ private:
     bool to_host_sending{false};
 
     // device info
-    const gs_device_config dev_config = {
-        .icount = NUM_CAN_CHANNEL - 1,
-        .sw_version = 2,
-        .hw_version = 1,
-    };
+    const gs_device_config dev_config;
 
     [[nodiscard]] CAN_Channel* GetChannel(const uint16_t ch) const {
-        return ch < channel_count ? &channels[ch] : nullptr;
+        return ch < channel_count ? pchannels[ch] : nullptr;
     }
 
     uint8_t PrepareReceive(USBD_HandleTypeDef *pdev);

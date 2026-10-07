@@ -1,5 +1,6 @@
 #include "can.h"
 #include "bxcan.h"
+#include "config.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
 #include "usbd_composite.h"
@@ -13,6 +14,7 @@ extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
 void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
 
+// TODO:多接口共用灯未处理
 static signal_led led{
     {LED_RX_GPIO_Port, LED_RX_Pin, true},
     {LED_TX_GPIO_Port, LED_TX_Pin, true}
@@ -51,7 +53,7 @@ static bxcan_ can_channel_0{
         },
     }
 };
-USBD_GS_CAN_HandleTypeDef hGS_CAN{can_channel_0};
+USBD_GS_CAN_HandleTypeDef hGS_CAN{{&can_channel_0}};
 static USBD_HandleTypeDef hUSB;
 
 static void USB_Disconnected() {
@@ -87,9 +89,9 @@ extern "C" void app_main() {
         hGS_CAN.USBD_GS_CAN_SendFrame(&hUSB);
 
         for (unsigned int i = 0; i < hGS_CAN.channel_count; i++) {
-            hGS_CAN.channels[i].send_frame(hGS_CAN.queue_to_host);
-            hGS_CAN.channels[i].CAN_HandleError(hGS_CAN.queue_to_host);
-            hGS_CAN.channels[i].led.update();
+            hGS_CAN.pchannels[i]->send_frame(hGS_CAN.queue_to_host);
+            hGS_CAN.pchannels[i]->CAN_HandleError(hGS_CAN.queue_to_host);
+            hGS_CAN.pchannels[i]->led.update();
         }
     }
 }

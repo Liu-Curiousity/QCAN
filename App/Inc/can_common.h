@@ -26,10 +26,6 @@
 
 #pragma once
 
-#define CAN_ERROR_WARNING_THRESHOLD	 96
-#define CAN_ERROR_PASSIVE_THRESHOLD	 128
-#define CAN_BUS_OFF_THRESHOLD		 256
-
 #ifdef __cplusplus
 
 #ifdef CONFIG_CANFD
@@ -52,12 +48,19 @@ struct gs_host_frame_object {
 };
 
 class CAN_Channel {
+    constexpr static auto CAN_QUEUE_SIZE = 64;
+    constexpr static auto CAN_ERROR_WARNING_THRESHOLD = 96;
+    constexpr static auto CAN_ERROR_PASSIVE_THRESHOLD = 128;
+    constexpr static auto CAN_BUS_OFF_THRESHOLD = 256;
+
 public:
+    virtual ~CAN_Channel() = default;
+
     CAN_Channel(const uint8_t nr, signal_led& led, const gs_device_bt_const& bt_const,
                 gs_device_bt_const_extended bt_const_ext = {}) :
         nr(nr), led(led), bt_const(bt_const), bt_const_ext(bt_const_ext) {}
 
-    queue_with_irq_lock<gs_host_frame_object> queue_from_host{64}; // 从上位机接收的帧队列
+    queue_with_irq_lock<gs_host_frame_object> queue_from_host{CAN_QUEUE_SIZE}; // 从上位机接收的帧队列
     uint32_t feature{};
     uint8_t nr;
     signal_led& led;

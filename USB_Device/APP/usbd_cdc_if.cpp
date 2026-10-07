@@ -113,7 +113,6 @@ uint8_t USBD_CDC_HandleTypeDef::DataIn(USBD_HandleTypeDef *pdev, uint8_t epnum) 
 uint8_t USBD_CDC_HandleTypeDef::DataOut(USBD_HandleTypeDef *pdev, uint8_t epnum) {
     if (epnum != (CDC_OUT_EP & EP_ADDR_MSK)) return USBD_OK;
 
-    // TODO:处理接收到的数据
     led.blink_request(signal_led::LED_TX);
     host_to_device.inBuffer(rx_buffer, USBD_LL_GetRxDataSize(pdev, epnum));
 
