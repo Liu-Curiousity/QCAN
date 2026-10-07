@@ -60,6 +60,18 @@ public:
         restore_irq(irq);
     }
 
+    bool front_pop_or_null(T *value) {
+        const bool irq = disable_irq();
+        if (!std::queue<T>::empty()) {
+            *value = std::queue<T>::front();
+            std::queue<T>::pop();
+            restore_irq(irq);
+            return true;
+        }
+        restore_irq(irq);
+        return false;
+    }
+
     T back() const {
         const bool irq = disable_irq();
         const T result = std::queue<T>::back();

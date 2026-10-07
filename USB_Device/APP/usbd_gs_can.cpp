@@ -227,16 +227,14 @@ static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint
 }
 
 void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) {
-    static gs_host_frame_object rx_frame{};
+    static gs_host_frame_object frame_object{};
     if (to_host_sending) return;
-    // TODO:可能被USB中断打断，导致为空时front和pop
-    if (queue_to_host.empty()) return;
-    rx_frame = queue_to_host.front();
+    if (!queue_to_host.front_pop_or_null(&frame_object)) return;
 
-    if (queue_to_host.is_overflow()) rx_frame.frame.flags |= GS_CAN_FLAG_OVERFLOW;
+    if (queue_to_host.is_overflow()) frame_object.frame.flags |= GS_CAN_FLAG_OVERFLOW;
 
-    const CAN_Channel *channel = &hGS_CAN.channels[rx_frame.frame.channel];
-    const gs_host_frame *frame = &rx_frame.frame;
+    const CAN_Channel *channel = &hGS_CAN.channels[frame_object.frame.channel];
+    const gs_host_frame *frame = &frame_object.frame;
     static uint8_t buf[CAN_DATA_MAX_PACKET_SIZE];
     uint8_t *send_addr = (uint8_t *)frame;
     size_t len;
@@ -277,7 +275,7 @@ void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) 
     }
 
     to_host_sending = true;
-    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) == USBD_OK) {
-        queue_to_host.pop();
+    if (USBD_GS_CAN_Transmit(pdev, send_addr, len) != USBD_OK) {
+        queue_to_host.push(frame_object);
     }
 }

@@ -91,13 +91,12 @@ void CAN_Channel::disable() {
 }
 
 void CAN_Channel::send_frame(queue_with_irq_lock<gs_host_frame_object>& queue_to_host) {
-    auto lock = disable_irq();
     static gs_host_frame_object frame_object{};
-    // TODO:可能被USB中断打断，导致为空时front和pop
-    if (!queue_from_host.empty()) {
-        frame_object = queue_from_host.front();
+
+    if (!is_enabled()) return;
+
+    if (queue_from_host.front_pop_or_null(&frame_object)) {
         if (drv_send(&frame_object.frame)) {
-            queue_from_host.pop();
             led.blink_request(signal_led::LED_TX);
             // Echo sent frame back to host
             frame_object.frame.reserved = 0x0;
@@ -106,9 +105,10 @@ void CAN_Channel::send_frame(queue_with_irq_lock<gs_host_frame_object>& queue_to
             else
                 frame_object.frame.classic_can_ts->timestamp_us = timer_get();
             queue_to_host.push(frame_object);
+        } else {
+            queue_from_host.push(frame_object);
         }
     }
-    restore_irq(lock);
 }
 
 void CAN_Channel::CAN_HandleError(queue_with_irq_lock<gs_host_frame_object>& queue_to_host) {
