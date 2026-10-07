@@ -21,7 +21,6 @@ endif()
 # Set the project name
 set(CMAKE_PROJECT_NAME QCAN)
 
-
 # Enable compile command to ease indexing with e.g. clangd
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
@@ -37,6 +36,8 @@ add_executable(${CMAKE_PROJECT_NAME})
 
 # Add STM32CubeMX generated sources
 add_subdirectory(cmake/stm32cubemx)
+
+add_subdirectory(USB_Device)
 
 # Link directories setup
 target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
@@ -68,6 +69,7 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
     stm32cubemx
 
     # Add user defined libraries
+        USB_Device_Library
 )
 
 add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
