@@ -1,4 +1,5 @@
 #include "can.h"
+#include "bxcan.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
 #include "usbd_composite.h"

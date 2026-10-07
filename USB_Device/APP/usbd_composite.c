@@ -28,7 +28,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "config.h"
 #include "gs_usb.h"
 #include "usbd_core.h"
 #include "usbd_ctlreq.h"

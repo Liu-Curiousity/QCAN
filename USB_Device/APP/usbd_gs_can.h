@@ -15,7 +15,6 @@
 
 #include "config.h"
 #include "usbd_def.h"
-#include "bxcan.h"
 
 #define GS_CAN_INTERFACE_NUM		 0
 #define GS_CAN_INTERFACE_STR_INDEX	 0xE0
