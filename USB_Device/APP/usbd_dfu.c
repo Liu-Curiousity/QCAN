@@ -1,7 +1,7 @@
 #include "usbd_dfu.h"
 #include <usbd_ioreq.h>
 
-static USBD_DFU_HandleTypeDef hDFU;
+extern USBD_DFU_HandleTypeDef hDFU;
 
 static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *req) {
     if (!((req->bmRequest & 0x1F) == USB_REQ_RECIPIENT_INTERFACE &&     // recipient: interface
@@ -36,7 +36,3 @@ static uint8_t USBD_DFU_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
 USBD_ClassTypeDef USBD_DFU = {
     .Setup = USBD_DFU_Setup,
 };
-
-bool USBD_DFU_DfuDetachRequested() {
-    return hDFU.dfu_detach_requested;
-}

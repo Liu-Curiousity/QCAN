@@ -11,8 +11,13 @@
  * Header exposes API for registering DFU images.
  */
 
-#ifndef ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H
-#define ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H
+#ifndef USB_CLASS_USBD_DFU_H
+#define USB_CLASS_USBD_DFU_H
+
+#ifdef __cplusplus
+extern "C" {
+
+#endif
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -116,9 +121,10 @@ typedef struct {
     bool dfu_detach_requested;
 } USBD_DFU_HandleTypeDef __attribute__ ((aligned (4)));
 
-
 extern USBD_ClassTypeDef USBD_DFU;
 
-void dfu_run_bootloader(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ZEPHYR_INCLUDE_USB_CLASS_USBD_DFU_H */

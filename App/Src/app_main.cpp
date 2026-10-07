@@ -5,6 +5,7 @@
 #include "usbd_gs_can.h"
 #include "usbd_cdc_if.h"
 #include "timer.h"
+#include "usbd_dfu.h"
 
 extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
@@ -15,6 +16,7 @@ static signal_led led{
     {LED_TX_GPIO_Port, LED_TX_Pin, true}
 };
 
+USBD_DFU_HandleTypeDef hDFU{};
 USBD_CDC_HandleTypeDef hCDC{led};
 
 static bxcan_ can_channel_0{
