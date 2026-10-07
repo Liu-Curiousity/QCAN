@@ -24,7 +24,6 @@
  *
  */
 
-#include "config.h"
 #include "can_common.h"
 #include "led.h"
 #include "timer.h"

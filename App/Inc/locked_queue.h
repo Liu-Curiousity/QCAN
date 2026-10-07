@@ -18,7 +18,7 @@ extern "C" {
 #endif
 
 #ifdef __cplusplus
-};
+}
 
 #include <queue>
 #include "util.h"
@@ -35,90 +35,71 @@ public:
     }
 
     void reset() {
-        const bool irq = disable_irq();
+        irqMutex lock_guard;
         while (!std::queue<T>::empty()) std::queue<T>::pop();
         overflow_count = 0;
-        restore_irq(irq);
     }
 
     bool push(const T& value) {
-        const bool irq = disable_irq();
-        bool ret = false;
+        irqMutex lock_guard;
         if (std::queue<T>::size() >= max_size) {
             overflow_count++;
         } else {
             std::queue<T>::push(value);
-            ret = true;
+            return true;
         }
-        restore_irq(irq);
-        return ret;
+        return false;
     }
 
     void pop() {
-        const bool irq = disable_irq();
+        irqMutex lock_guard;
         std::queue<T>::pop();
-        restore_irq(irq);
     }
 
     bool front_pop_or_null(T *value) {
-        const bool irq = disable_irq();
+        irqMutex lock_guard;
         if (!std::queue<T>::empty()) {
             *value = std::queue<T>::front();
             std::queue<T>::pop();
-            restore_irq(irq);
             return true;
         }
-        restore_irq(irq);
         return false;
     }
 
     T back() const {
-        const bool irq = disable_irq();
-        const T result = std::queue<T>::back();
-        restore_irq(irq);
-        return result;
+        irqMutex lock_guard;
+        return std::queue<T>::back();
     }
 
     T front() const {
-        const bool irq = disable_irq();
-        const T result = std::queue<T>::front();
-        restore_irq(irq);
-        return result;
+        irqMutex lock_guard;
+        return std::queue<T>::front();
     }
 
     bool empty() const {
-        const bool irq = disable_irq();
-        const bool result = std::queue<T>::empty();
-        restore_irq(irq);
-        return result;
+        irqMutex lock_guard;
+        return std::queue<T>::empty();
     }
 
     bool full() const {
-        const bool irq = disable_irq();
-        const bool result = std::queue<T>::size() >= max_size;
-        restore_irq(irq);
-        return result;
+        irqMutex lock_guard;
+        return std::queue<T>::size() >= max_size;
     }
 
     auto size() const {
-        const bool irq = disable_irq();
-        const auto result = std::queue<T>::size();
-        restore_irq(irq);
-        return result;
+        irqMutex lock_guard;
+        return std::queue<T>::size();
     }
 
     void swap(queue_with_irq_lock& other) noexcept {
-        const bool irq = disable_irq();
+        irqMutex lock_guard;
         std::queue<T>::swap(other);
-        restore_irq(irq);
     }
 
     template <typename... Args>
     auto& emplace(Args&&... _args) {
-        const bool irq = disable_irq();
-        auto& result = std::queue<T>::emplace(std::forward<Args>(_args)...);
-        restore_irq(irq);
-        return result;
+        irqMutex lock_guard;
+        return std::queue<T>::emplace(std::forward<Args>(_args)...);
     }
 
 private:

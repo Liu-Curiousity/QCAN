@@ -6,6 +6,7 @@
 #include "usbd_cdc_if.h"
 #include "timer.h"
 #include "usbd_dfu.h"
+#include "util.h"
 
 extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
