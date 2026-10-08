@@ -30,6 +30,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Init(USBD_HandleTypeDef *pdev, uint8_t cfgidx
 uint8_t USBD_GS_CAN_HandleTypeDef::DeInit(USBD_HandleTypeDef *pdev, uint8_t cfgidx) {
     USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_IN);
     USBD_LL_CloseEP(pdev, GSUSB_ENDPOINT_OUT);
+    to_host_sending = false;
     return USBD_OK;
 }
 
