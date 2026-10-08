@@ -15,7 +15,7 @@ uint8_t USBD_GS_CAN_HandleTypeDef::PrepareReceive(USBD_HandleTypeDef *pdev) {
         pdev,
         GSUSB_ENDPOINT_OUT,
         reinterpret_cast<uint8_t *>(&from_host_buf.frame),
-        struct_size(&from_host_buf.frame, canfd_ts, 1)
+        sizeof(from_host_buf)
     );
 }
 
@@ -277,6 +277,6 @@ void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) 
     to_host_sending = true;
     if (USBD_GS_CAN_Transmit(pdev, send_addr, len) != USBD_OK) {
         queue_to_host.push(frame_object);
-            to_host_sending = false;
+        to_host_sending = false;
     }
 }

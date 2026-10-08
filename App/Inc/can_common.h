@@ -43,8 +43,6 @@ struct gs_host_frame_object {
         uint8_t _buf[GS_HOST_FRAME_SIZE];
         gs_host_frame frame;
     };
-
-    gs_host_frame_object& operator=(int _cpp_par_);
 };
 
 class CAN_Channel {
