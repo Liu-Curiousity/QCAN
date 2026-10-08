@@ -277,5 +277,6 @@ void USBD_GS_CAN_HandleTypeDef::USBD_GS_CAN_SendFrame(USBD_HandleTypeDef *pdev) 
     to_host_sending = true;
     if (USBD_GS_CAN_Transmit(pdev, send_addr, len) != USBD_OK) {
         queue_to_host.push(frame_object);
+            to_host_sending = false;
     }
 }
