@@ -216,10 +216,6 @@ uint8_t USBD_GS_CAN_HandleTypeDef::Control(uint8_t bRequest, uint16_t wValue) {
     return USBD_OK;
 }
 
-void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev) {
-    // hGS_CAN.PrepareReceive(pdev);
-}
-
 static uint8_t USBD_GS_CAN_Transmit(USBD_HandleTypeDef *pdev, uint8_t *buf, uint16_t len) {
     if (pdev->dev_state == USBD_STATE_CONFIGURED) {
         return USBD_LL_Transmit(pdev, GSUSB_ENDPOINT_IN, buf, len);

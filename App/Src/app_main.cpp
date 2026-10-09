@@ -12,8 +12,6 @@
 
 extern USBD_COMPOSITE_HandleTypeDef hcomposite;
 
-void USBD_GS_CAN_ReceiveFromHost(USBD_HandleTypeDef *pdev);
-
 // TODO:多接口共用灯未处理
 static signal_led led{
     {LED_RX_GPIO_Port, LED_RX_Pin, true},
@@ -82,9 +80,6 @@ extern "C" void app_main() {
     hUSB.pClassData = &hcomposite;
     USBD_Start(&hUSB);
     while (true) {
-        /*==========================从上位机接收帧============================*/
-        USBD_GS_CAN_ReceiveFromHost(&hUSB);
-
         /*==========================向上位机发送帧============================*/
         hGS_CAN.USBD_GS_CAN_SendFrame(&hUSB);
 
